@@ -18,7 +18,12 @@ export function queryPresentation(receipt: ToolReceipt, label: string): ReplyDoc
   if(name==='browser.collect')return {state:'pending',title:'已读取连续页面，等待证据核验',blocks:[],notes:[`本次访问 ${Number.isSafeInteger(data.visitedPages)?data.visitedPages:0} 页；${text(data.coverage,100)??'覆盖尚未确认'}。`]}
   if(name==='browser.verify')return {state:data.goalVerified===true?data.partial===true?'partial':'completed':'unknown',title:'已核对本次页面证据',blocks:[{type:'text',text:text(data.answer,800)??'当前证据不足。'}],notes:['只覆盖本次页面；不代表全部账号、历史新增或所有分页。']}
   if(name==='browser.act')return {state:'pending',title:data.data&&object(data.data).actionStatus==='dispatched'?'页面动作已发出，正在核验':'页面动作尚未执行',blocks:[],notes:['点击或检索提交不表示目标完成。']}
-  if (name === 'browser.status') return { state: 'completed', title: label, blocks: [{ type: 'text', text: data.enabled !== true ? '浏览器连接未开启。' : data.paired !== true ? 'Edge扩展尚未配对。' : data.online !== true ? 'Edge扩展暂未在线。' : 'Edge扩展已连接；这只是连接检查，还没有读取目标内容。' }], notes: [] }
+  if (name === 'browser.status') {
+    const status = data.backend === 'managed'
+      ? data.enabled === true ? '小鱼专用浏览器已开启，查询时会打开目标网站。当前还没有读取目标内容。' : '小鱼专用浏览器未开启。'
+      : data.enabled !== true ? '浏览器连接未开启。' : data.paired !== true ? 'Edge 扩展尚未配对。' : data.online !== true ? 'Edge 扩展暂未在线。' : 'Edge 扩展已连接。当前还没有读取目标内容。'
+    return { state: 'completed', title: label, blocks: [{ type: 'text', text: status }], notes: [] }
+  }
   if (name === 'browser.followed_live') {
     const body = object(data.data)
     if (data.verified !== true || !Array.isArray(body.rooms)) return { state: 'unknown', title: '无法核验关注直播结果', blocks: [], notes: ['不能确认开播情况。'] }

@@ -25,6 +25,7 @@
 - 修正后Windows原生全量182项通过、14项忽略，包含超过200个条目时仍查到目标且排除禁止子目录的测试。最终前端类型、目标lint、文档一致性及生产Web构建通过。
 - Windows Release和NSIS候选已生成并与镜像逐字节核对。首次检测到一隅在运行，替换按约定中止；用户随后明确允许替换，既有脚本运行状态双检通过，返回 `YIYU_DELIVERY_UPDATED`。桌面EXE与本批候选逐字节一致。实现提交 `a580f9e` 已推送并核对用户批准的feature/multi-device分支。
 - 同版修补：截图中的指定主播开播问句先被站点匹配拦截，现共用命名直播意图识别，直接使用公开实时查询。主应用与桌宠聊天标题栏加入主题色「本机／普通」切换。106项定向、类型和目标lint通过，生产浏览器冷暖两种样式在280/360/540宽度布局及切换通过；Windows Release及NSIS打包后桌面双检替换通过。截图问句使用查询替身验证，真实B站状态等待实际查询。
+- 直播回执复查：旧状态文案固定显示 Edge，现使用所选后端。缺主播名的开播追问在同窗口、同会话模式内复用最近的临时目标；仍缺目标时询问昵称。指定主播走公开实时接口，关注列表走所选浏览器，未绑定目标的普通对话停止浏览器诊断与页面调用。146项定向（含完整会话入口与后端调用替身）、类型、目标lint及生产构建通过。最新 Release 和 NSIS 与 Windows 镜像核对通过，检测到一隅运行，桌面替换中止。真实B站查询待用户体验。
 
 ## 前次操作：DEC111平板自适应0.7候选已生成，待真机体验
 
@@ -152,11 +153,11 @@
 
 | 产物 | 位置/核对结果 |
 |---|---|
-| Windows候选 EXE | 项目 `apps/desktop/src-tauri/target/release/yiyu.exe`、Windows镜像与桌面直接运行版一致；2026-11-24 DEC112同版修补 |
-| 候选EXE SHA-256 | `c9dc8e951aaa8f93294ca7f12c2e18c20ec25dd45114dfbb7c439954d952768b` |
-| 桌面EXE SHA-256 | `c9dc8e951aaa8f93294ca7f12c2e18c20ec25dd45114dfbb7c439954d952768b`，修补版已替换并核对 |
+| Windows候选 EXE | 项目 `apps/desktop/src-tauri/target/release/yiyu.exe` 和 Windows 镜像一致；本次运行保护中止桌面替换 |
+| 候选EXE SHA-256 | `ff692663f86e14696ba08618f9a1792a4097fcc089097df2960bd0dcdca17fc2` |
+| 桌面EXE SHA-256 | `c9dc8e951aaa8f93294ca7f12c2e18c20ec25dd45114dfbb7c439954d952768b`，仍为前一修补版 |
 | NSIS | `apps/desktop/src-tauri/target/release/bundle/nsis/一隅_2.0.0_x64-setup.exe`，只在target，不放桌面 |
-| NSIS SHA-256 | `28e27ae962c6ca90f502de845a38e6ec808fb7ff5d7d45cbf735e35b3f32d485` |
+| NSIS SHA-256 | `ee7cc118c4250eacbf68786343b5299f8b06fefbe94b9349381f4293f1e586f3` |
 | Android 调试预览 | `apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk`，0.7.0-preview，3,951,645字节（约3.8MiB），下载目录同份，不进Git |
 | APK SHA-256 | `19293d6dd56965553beb798a2284b8b8e5297c901cf7afeb62273072116ea410` |
 

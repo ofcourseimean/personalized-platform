@@ -3,6 +3,7 @@ import { createSeedLibrary } from '../../domain/seed'
 import { bilibiliSetupSites } from '../../domain/browser'
 import { useLibraryStore } from '../../state/useLibraryStore'
 import { sendCompanionTurn } from '../companion/companionConversation'
+import { clearLiveStatusTarget } from '../companion/liveStatusSession'
 import { browserDateRange } from './parameters'
 import type { AgentModelRequest } from '../companion/agent/types'
 const mock=vi.hoisted(()=>({native:vi.fn(),generate:vi.fn()}))
@@ -12,6 +13,7 @@ vi.mock('../../infrastructure/libraryRepository',()=>({libraryRepository:{save:v
 const origin='https://example.com'
 beforeEach(()=>{
   mock.native.mockReset();mock.generate.mockReset()
+  clearLiveStatusTarget('main:private');clearLiveStatusTarget('desktop:private')
   vi.stubGlobal('__TAURI_INTERNALS__',{})
   const data=createSeedLibrary();data.settings.trust.externalAiProcessing=true;data.companion.browser={enabled:true,backend:'managed',sites:[origin],interactionSites:[origin]}
   useLibraryStore.setState({data})
@@ -37,6 +39,55 @@ it('checks the named streamer through public tools with all five Bilibili domain
   expect(mock.generate).not.toHaveBeenCalled()
   expect(reply).toMatch(/^「天才美少女卡莎」正在直播。/)
   expect(reply).not.toMatch(/目标网站|搜索摘要|https:/)
+  mock.native.mockClear()
+  expect(await sendCompanionTurn('查询是否开播')).toMatch(/^「天才美少女卡莎」正在直播。/)
+  expect(mock.native.mock.calls.map(([command]) => command)).toEqual(['web_search', 'public_web_live_status'])
+  mock.native.mockClear()
+  const desktop = { conversationChannel: 'desktop' as const }
+  expect(await sendCompanionTurn('查询是否开播', desktop)).toBe('你想查哪位主播？告诉我直播昵称就可以。')
+  expect(mock.native).not.toHaveBeenCalled()
+  expect(await sendCompanionTurn('天才美少女卡莎', desktop)).toMatch(/^「天才美少女卡莎」正在直播。/)
+  expect(mock.native.mock.calls.map(([command]) => command)).toEqual(['web_search', 'public_web_live_status'])
+  expect(mock.generate).not.toHaveBeenCalled()
+})
+
+it('keeps followed-live queries on the selected managed browser', async () => {
+  const data = useLibraryStore.getState().data
+  data.companion.browser!.sites = [...bilibiliSetupSites]
+  data.companion.permissions.internet = true
+  mock.native.mockImplementation(async (command, args) => {
+    if (command === 'managed_browser_configure') return { epoch: 3 }
+    expect(command).toBe('managed_browser_request')
+    expect(args.request).toMatchObject({ kind: 'followed_live', origin: 'https://live.bilibili.com' })
+    return { verified: true, privateBrowser: true, data: { loggedIn: true, complete: true, checked: 1, rooms: [{ roomId: 42, name: '虚构主播', liveStatus: 1 }] } }
+  })
+  expect(await sendCompanionTurn('我关注的B站主播有谁在开播')).toContain('虚构主播')
+  expect(mock.native.mock.calls.map(([command]) => command)).toEqual(['managed_browser_configure', 'managed_browser_request'])
+  expect(mock.generate).not.toHaveBeenCalled()
+})
+
+it('shows the actual configured backend for an explicit connection check', async () => {
+  const data = useLibraryStore.getState().data
+  data.companion.permissions.internet = true
+  mock.native.mockImplementation(async (command) => ({
+    backend: command === 'managed_browser_configure' ? 'managed' : undefined,
+    enabled: true, online: true, paired: true, epoch: 3,
+  }))
+  expect(await sendCompanionTurn('检查浏览器连接状态')).toContain('小鱼专用浏览器已开启')
+  delete data.companion.browser!.backend
+  expect(await sendCompanionTurn('检查浏览器连接状态')).toContain('Edge 扩展已连接')
+  expect(mock.native.mock.calls.map(([command]) => command)).toEqual(['managed_browser_configure', 'browser_bridge_status'])
+  expect(mock.generate).not.toHaveBeenCalled()
+})
+
+it('blocks browser diagnostics offered by the model without a resolved target', async () => {
+  mock.generate.mockImplementation(async (request: AgentModelRequest) => {
+    expect(request.tools?.some(tool => tool.name.startsWith('browser.'))).toBe(false)
+    return { type: 'tool_call', call: { id: 'unsolicited', name: 'browser.status', arguments: {} } }
+  })
+  expect(await sendCompanionTurn('确认一下开播信息')).toBe('你想查哪位主播？告诉我直播昵称就可以。')
+  expect(mock.generate).toHaveBeenCalledOnce()
+  expect(mock.native).not.toHaveBeenCalled()
 })
 
 it('plans model-interpreted dates and sorting through normal tools without sending page bodies or native parameter provenance',async()=>{

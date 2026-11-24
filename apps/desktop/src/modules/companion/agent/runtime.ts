@@ -1,4 +1,5 @@
-import { companionIdentityPrompt } from '../../../domain/companionIdentity'
+import { companionIdentityPrompt, stripCompanionAddress } from '../../../domain/companionIdentity'
+import { needsLiveStatusTarget } from '../../../domain/liveStatusIntent'
 import type { AgentApplicationServices } from './applicationServices'
 import { AgentPermissionEngine, permissionDeniedResult } from './permission'
 import { AgentToolRegistry } from './toolRegistry'
@@ -12,7 +13,8 @@ import { BrowserReadBudget, BROWSER_PROMPT,BROWSER_CONTINUATION_PROMPT } from '.
 import { followedLiveIntent } from '../../browser-connection/goal'
 import { ExecutionSession } from '../../task-kernel/session'
 import { browserTaskPrompt } from '../../browser-connection/taskGoal'
-import { BrowserQueryFlow, browserPurposeBlock } from '../../browser-connection/queryFlow'
+import { isBrowserConnectionCheck } from '../../browser-connection/taskIntent'
+import { BrowserQueryFlow, browserPurposeBlock, unboundBrowserToolBlock } from '../../browser-connection/queryFlow'
 import { AttachmentFlow } from '../../browser-connection/attachmentFlow'
 import { followedLiveReply } from '../../browser-connection/followedReply'
 import { ReplySession } from '../replies/session'
@@ -133,10 +135,15 @@ export async function runAgent(input: RunAgentInput) {
   ]
   let toolSteps = 0
   const toolDefinitions = input.registry.definitions()
+  const command = stripCompanionAddress(input.message, input.context.companion.name)
   const folderFlow = !browserTask && !input.operation ? input.folderFlow : undefined
   const folderStart = folderFlow?.start()
   if (folderStart?.reply) return finishLocal(folderStart.reply, true)
   if (!input.operation && browserTask?.clarification) return finishLocal(browserTask.clarification)
+  if (!input.operation && !browserTask && needsLiveStatusTarget(command)) {
+    execution.transition('clarifying')
+    return finishLocal('你想查哪位主播？告诉我直播昵称就可以。', true)
+  }
   if (browserTask) messages.push({ role: 'system', content: browserTaskPrompt(browserTask) })
   const browserFlow = !input.operation && browserTask ? new BrowserQueryFlow(browserTask, input.message) : undefined
   const attachmentFlow = browserTask?.downloadAllowed && !input.operation ? new AttachmentFlow(input.message) : undefined
@@ -166,10 +173,14 @@ export async function runAgent(input: RunAgentInput) {
   let modelRounds = 0
   messages.push({ role: 'system', content: PUBLIC_READ_PROMPT })
   if (liveRoomFlow?.unavailableReply) return finishLocal(liveRoomFlow.unavailableReply)
+  const browserBlock = (name: string) => input.services.assertBrowserAuthority && !browserTask && input.operation?.scope !== 'browser'
+    ? unboundBrowserToolBlock(command, name) : undefined
+  const browserCheck: AgentToolCall | undefined = !input.operation && !browserTask && isBrowserConnectionCheck(command) && input.registry.lookup('browser.status')
+    ? { id: `browser-check-${crypto.randomUUID()}`, name: 'browser.status', arguments: {} } : undefined
   const taskPlanRequired = !followedQuery && Boolean(actionIntent.requiresTaskPlan)
   const modelToolDefinitions = (taskPlanRequired
-    ? toolDefinitions.filter((tool) => tool.name === 'task.create') : toolDefinitions).filter(tool => (!input.operation || operationAllows(input.operation.scope, tool)) && (!experience || operationAllows(experience.scope, tool)) && !browserPurposeBlock(input.message, {id:'definition',name:tool.name,arguments:{}}, browserTask))
-  let directAction = folderStart?.nextCall ?? browserFlow?.initialCall ?? (followedQuery ? {id:`browser-direct-${crypto.randomUUID()}`,name:'browser.followed_live',arguments:{}} : liveRoomFlow?.initialCall ?? actionIntent.directCall)
+    ? toolDefinitions.filter((tool) => tool.name === 'task.create') : toolDefinitions).filter(tool => (!input.operation || operationAllows(input.operation.scope, tool)) && (!experience || operationAllows(experience.scope, tool)) && !browserBlock(tool.name) && !browserPurposeBlock(input.message, {id:'definition',name:tool.name,arguments:{}}, browserTask))
+  let directAction = folderStart?.nextCall ?? browserFlow?.initialCall ?? browserCheck ?? (followedQuery ? {id:`browser-direct-${crypto.randomUUID()}`,name:'browser.followed_live',arguments:{}} : liveRoomFlow?.initialCall ?? actionIntent.directCall)
   let actionRetryUsed = false
   let malformedToolRetryUsed = false
   let verificationRetry=false
@@ -274,7 +285,7 @@ export async function runAgent(input: RunAgentInput) {
     const writeKey = input.operation || experience ? operationWriteKey(call, tool?.definition) : undefined
     const scope = input.operation?.scope ?? experience?.scope
     const scopeBlock = scope && tool && !operationAllows(scope, tool.definition) ? '该工具超出本次方法的执行范围；方法不能扩大权限或启动嵌套任务' : writeKey && methodWrites.has(writeKey) ? '本次方法已尝试相同写入，不能重复；请先核对现场结果' : undefined
-    const purposeBlock = browserPurposeBlock(input.message, call, browserTask)
+    const purposeBlock = browserBlock(call.name) ?? browserPurposeBlock(input.message, call, browserTask)
     const localDelivery = attachmentFlow?.owns(call) === true
     const verificationBeforeDownload=attachmentFlow&&['browser.verify','browser.verify_collection'].includes(call.name)?'本轮需要下载文件，页面文字不能替代下载回执':undefined
     const readBlock = purposeBlock ?? scopeBlock ?? verificationBeforeDownload ?? (localDelivery ? undefined : browserReads.check(call, tool?.definition) ?? (trustedRoomOpen ? undefined : publicReads.check(call, tool?.definition)))
@@ -322,11 +333,12 @@ export async function runAgent(input: RunAgentInput) {
     }
     browserReads.accept(call, result)
     reply.accept({ call, result, definition: tool?.definition })
+    if (call === browserCheck) return finishLocal('')
     const attachmentNext=attachmentFlow?.advance(call,result)
     if(attachmentNext?.reply)return finishLocal(attachmentNext.reply,true)
     if(attachmentNext?.nextCall){directAction=attachmentNext.nextCall;continue}
     if(['browser.verify','browser.verify_collection'].includes(call.name)&&result.success){execution.transition('verified');return finishLocal('')}
-    if (purposeBlock) return finishLocal(purposeBlock)
+    if (purposeBlock) return finishLocal(purposeBlock, Boolean(browserBlock(call.name)))
     const browserNext = browserFlow?.advance(call, result)
     if (browserNext?.reply) return finishLocal(browserNext.reply)
     if (browserNext?.nextCall) {

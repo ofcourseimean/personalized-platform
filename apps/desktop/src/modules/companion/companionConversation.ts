@@ -1,4 +1,6 @@
 import type { CompanionMessage, CompanionVideoState } from '../../domain/models'
+import { stripCompanionAddress } from '../../domain/companionIdentity'
+import { needsLiveStatusTarget } from '../../domain/liveStatusIntent'
 import { createCompanionProvider } from '../../infrastructure/companionProvider'
 import { useLibraryStore } from '../../state/useLibraryStore'
 import { applyContextPrivacy, applyHistoryPrivacy, assertExternalAiAllowed } from '../trust/trustPolicy'
@@ -16,6 +18,7 @@ import { createLiveCompanionApplicationServices } from './liveApplicationService
 import { armBrowserHandoff,cancelBrowserHandoff } from '../browser-connection/managed/handoff'
 import { privateConversation } from './conversationPrivacy'
 import { inConversationLane } from './conversationLane'
+import { clearLiveStatusTarget, continueLiveStatusTurn, rememberLiveStatusTarget } from './liveStatusSession'
 export { createLiveCompanionApplicationServices } from './liveApplicationServices'
 
 export interface CompanionTurnOptions {
@@ -45,9 +48,11 @@ export async function sendCompanionTurn(message: string, options: CompanionTurnO
   const { data, temporaryCompanionWorkIds } = store
   const privateSession = privateConversation()
   const channel=options.conversationChannel??'main'
-  const folderChannel = `${channel}:${privateSession ? 'private' : 'ordinary'}`
-  const folderFlow = operation ? undefined : prepareFolderFlow(userText, data.companion.computer, folderChannel)
-  const prepared=operation?undefined:prepareBrowserTurn(userText,data.companion,folderChannel)
+  const taskChannel = `${channel}:${privateSession ? 'private' : 'ordinary'}`
+  if (operation) clearLiveStatusTarget(taskChannel)
+  const folderFlow = operation ? undefined : prepareFolderFlow(userText, data.companion.computer, taskChannel)
+  const resolvedText = operation ? userText : continueLiveStatusTurn(userText, data.companion.name, taskChannel)
+  const prepared=operation?undefined:prepareBrowserTurn(resolvedText,data.companion,taskChannel)
   const clean=prepared?.message??userText
   if (!privateSession && !folderFlow) new PrivacySession([]).sanitize(clean)
   const taskText = operation?.goal ?? clean
@@ -101,7 +106,7 @@ export async function sendCompanionTurn(message: string, options: CompanionTurnO
     }
     options.onStatus?.(status)
   }
-  const pendingUser: CompanionMessage = { id: `message-${crypto.randomUUID()}`, role: 'user', content: clean, createdAt: new Date().toISOString(), contextSummary, syncScope: privateSession ? 'local' : 'ordinary-local', localOnly: Boolean(localAction && localRitualTools.has(localAction.name)) }
+  const pendingUser: CompanionMessage = { id: `message-${crypto.randomUUID()}`, role: 'user', content: resolvedText === userText ? clean : userText, createdAt: new Date().toISOString(), contextSummary, syncScope: privateSession ? 'local' : 'ordinary-local', localOnly: Boolean(localAction && localRitualTools.has(localAction.name)) }
   if (!operation && !folderFlow && !privateBrowserQuery && data.settings.trust.retainConversationHistory) store.addCompanionMessage(pendingUser)
   try {
     const result = await runAgent({
@@ -146,11 +151,15 @@ export async function sendCompanionTurn(message: string, options: CompanionTurnO
     })
     if (operation) finishOperationTurn(result, options.onOperationReceipt)
     else if (!folderFlow) offerOperationTraining(clean, result)
+    const askingForStreamer = result.execution.phase === 'clarifying' && needsLiveStatusTarget(stripCompanionAddress(clean, data.companion.name))
+    if (!operation && !options.signal?.aborted && (askingForStreamer || result.audit.some(entry => entry.toolName === 'web.live_status' || entry.toolName === 'web.search'))) {
+      rememberLiveStatusTarget(clean, data.companion.name, taskChannel)
+    }
     if(data.companion.operationLearning?.enabled!==false&&prepared?.resolvedFromClarification&&prepared.task?.origins.length===1&&result.audit.some(item=>item.toolName==='browser.verify'&&item.resultStatus==='success')){
       const role=prepared.task.objective==='mail'?'mail':prepared.task.objective==='page'&&/(?:通知|公告|门户)/u.test(clean)?'portal':undefined
       if(role)useLibraryStore.getState().setCompanionBrowser({preferredSites:{...useLibraryStore.getState().data.companion.browser?.preferredSites,[role]:prepared.task.origins[0]}})
     }
-    if(!operation&&!options.signal?.aborted&&(!prepared?.task?.downloadAllowed||result.execution.phase==='clarifying'))rememberBrowserTurn(prepared?.task,useLibraryStore.getState().data.companion,folderChannel,clean)
+    if(!operation&&!options.signal?.aborted&&(!prepared?.task?.downloadAllowed||result.execution.phase==='clarifying'))rememberBrowserTurn(prepared?.task,useLibraryStore.getState().data.companion,taskChannel,clean)
     const transientReply = operation || folderFlow || privateBrowserQuery || result.audit.some(entry => entry.toolName.startsWith('browser.') && entry.toolName !== 'browser.status') || !data.settings.trust.retainConversationHistory
     if (transientReply) displayTransient('companion', result.text)
     else if (!options.signal?.aborted) {
@@ -164,7 +173,7 @@ export async function sendCompanionTurn(message: string, options: CompanionTurnO
     if(handoff&&!browserVerified&&!operation&&!options.signal?.aborted)armBrowserHandoff(channel,clean,handoff.origin,handoff.epoch)
     return result.text
   } finally {
-    if(options.signal?.aborted){forgetBrowserTurn(folderChannel);clearFolderChoice(folderChannel)}
+    if(options.signal?.aborted){forgetBrowserTurn(taskChannel);clearFolderChoice(taskChannel);clearLiveStatusTarget(taskChannel)}
     globalThis.clearTimeout(thinkingTimer)
     options.onStatus?.(undefined)
   }

@@ -14,6 +14,7 @@ import { AgentTaskCard } from './tasks/AgentTaskCard'
 import { conversationMessages } from './conversationMessages'
 import { isLegacyBrowserSummary } from './browserHistorySummary'
 import { ConversationPrivacyToggle } from './ConversationPrivacyToggle'
+import { clearLiveStatusTarget } from './liveStatusSession'
 import { privateConversation, subscribeConversationPrivacy } from './conversationPrivacy'
 import { inConversationLane } from './conversationLane'
 
@@ -97,7 +98,12 @@ export function CompanionPanel() {
       <div className="companion-panel-identity"><span className={`companion-avatar ${data.companion.expression} hair-${data.companion.appearance.hair} outfit-${data.companion.appearance.outfit}`}>隅</span><span><strong>{data.companion.name}</strong><small>{context.activeChapter?.title ?? context.activeWork?.title ?? '未授权任何创作上下文'}</small></span></div>
       <div className="companion-panel-actions">
         <ConversationPrivacyToggle disabled={busy} />
-        {savedMessages.length + transientMessages.length > 0 && <button aria-label="清空伙伴对话" onClick={() => { if (!privateSession && !window.confirm('清空普通会话？删除会同步到已配对设备；仅本机会话保留。')) return; clearCompanionMessages(privateSession ? 'local' : 'ordinary'); setTransientMessages([]) }}><Trash2 size={13} /></button>}
+        {savedMessages.length + transientMessages.length > 0 && <button aria-label="清空伙伴对话" onClick={() => {
+          if (!privateSession && !window.confirm('清空普通会话？删除会同步到已配对设备；仅本机会话保留。')) return
+          clearLiveStatusTarget(privateSession ? 'main:private' : 'main:ordinary')
+          clearCompanionMessages(privateSession ? 'local' : 'ordinary')
+          setTransientMessages([])
+        }}><Trash2 size={13} /></button>}
       </div>
     </header>
     {encryptedNeedsGrant && <button className="temporary-grant" onClick={() => grantTemporaryCompanionWork(work!.id, true)}><LockKeyhole size={13} />仅本次解锁会话允许读取《{work!.title}》</button>}

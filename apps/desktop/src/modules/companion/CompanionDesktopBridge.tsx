@@ -31,6 +31,7 @@ import { PrivacySession, type PrivacyReviewRequest } from '../privacy'
 import { usePlannerNotifications } from './usePlannerNotifications'
 import { useLyricsWindowBridge } from '../music-companion/lyrics-window/useLyricsWindowBridge'
 import { cancelBrowserHandoff,receiveBrowserHandoff } from '../browser-connection/managed/handoff'
+import { clearLiveStatusTarget } from './liveStatusSession'
 
 const isTauri = () => '__TAURI_INTERNALS__' in window
 
@@ -340,6 +341,7 @@ export function CompanionDesktopBridge() {
       if (sending.current) return
       const scope = privateConversation() ? 'local' : 'ordinary'
       if (event.payload?.scope !== scope && !(scope === 'local' && !event.payload?.scope)) return
+      clearLiveStatusTarget(scope === 'local' ? 'desktop:private' : 'desktop:ordinary')
       clearCompanionMessages(scope)
       void emitTo('companion-chat', 'companion:transient-clear')
       setAgentStatus(undefined)

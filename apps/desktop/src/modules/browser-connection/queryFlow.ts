@@ -1,6 +1,15 @@
 import type { AgentToolCall, AgentToolResult } from '../companion/agent/types'
 import type { BrowserTaskGoal } from './taskGoal'
 import { browserObjective } from './taskGoal'
+import { isBrowserConnectionCheck } from './taskIntent'
+
+export function unboundBrowserToolBlock(message: string, name: string) {
+  if (!name.startsWith('browser.')) return
+  if (name === 'browser.status' && isBrowserConnectionCheck(message)) return
+  return /(?:开播|直播|在播)/u.test(message)
+    ? '你想查哪位主播？告诉我直播昵称就可以。'
+    : '请告诉我要查看的网站和需要查询的内容。'
+}
 
 export function browserPurposeBlock(message: string, call: AgentToolCall, task?: BrowserTaskGoal) {
   if (call.name !== 'browser.followed_live') return
