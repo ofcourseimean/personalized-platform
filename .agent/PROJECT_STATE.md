@@ -23,7 +23,7 @@
 - 单窗口UIA增加选择、展开、收起、上下滚动，并根据控件状态校验。具体选择沿用确认，窗口、控件和过期边界继续由原生检查。命名直播查询只展示实时结论和时间。后台搜索留在本机执行轨迹。
 - 隔离Chromium夹具验证保存字节、拒绝HTML伪装、重定向/跨域和旧引用、精确页面选择。最终定向98项通过，包含常规会话入口的本机目录短续接、课程澄清、附件接Windows动作和指定主播直播状态。Windows全量前端253文件1455项通过后，首轮Rust编译报告下载回执校验变量名错误，修正后分段复核，不重跑前端全量。真实网络学堂登录/附件结构和Windows实际应用打开待验。M13.4、Android APK和云中枢独立于本批。
 - 修正后Windows原生全量182项通过、14项忽略，包含超过200个条目时仍查到目标且排除禁止子目录的测试。最终前端类型、目标lint、文档一致性及生产Web构建通过。
-- Windows Release和NSIS候选已生成并与镜像逐字节核对。检测到一隅在运行，桌面替换按约定中止，桌面SHA保持原值。候选见下表。工作继续在用户批准的feature/multi-device分支。
+- Windows Release和NSIS候选已生成并与镜像逐字节核对。首次检测到一隅在运行，替换按约定中止；用户随后明确允许替换，既有脚本运行状态双检通过，返回 `YIYU_DELIVERY_UPDATED`。桌面EXE与本批候选逐字节一致。实现提交 `a580f9e` 已推送并核对用户批准的feature/multi-device分支。
 
 ## 前次操作：DEC111平板自适应0.7候选已生成，待真机体验
 
@@ -151,9 +151,9 @@
 
 | 产物 | 位置/核对结果 |
 |---|---|
-| Windows候选 EXE | 项目 `apps/desktop/src-tauri/target/release/yiyu.exe`与Windows镜像一致；2026-11-24 DEC112候选，运行保护已中止桌面替换 |
+| Windows候选 EXE | 项目 `apps/desktop/src-tauri/target/release/yiyu.exe`、Windows镜像与桌面直接运行版一致；2026-11-24 DEC112候选 |
 | 候选EXE SHA-256 | `75f603bcd01dac237b84efd1d596d4986d0beba99b410008662faff8f6ad32fd` |
-| 桌面EXE SHA-256 | `01a28d56bfe72080c77f2ae8f2798c022c03066e08e45cd240c0485f4ac6ac8b`，运行中的桌面版仍为2026-10-23 DEC110 |
+| 桌面EXE SHA-256 | `75f603bcd01dac237b84efd1d596d4986d0beba99b410008662faff8f6ad32fd`，DEC112已替换并核对 |
 | NSIS | `apps/desktop/src-tauri/target/release/bundle/nsis/一隅_2.0.0_x64-setup.exe`，只在target，不放桌面 |
 | NSIS SHA-256 | `833eee6ef0be78f91f3c898a75bd8b2e6e9d1c79e298ee98b83a8cc7155c01b7` |
 | Android 调试预览 | `apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk`，0.7.0-preview，3,951,645字节（约3.8MiB），下载目录同份，不进Git |
