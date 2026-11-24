@@ -6,7 +6,7 @@ import { createCompanionToolRegistry } from './tools'
 import { AgentPermissionEngine } from './permission'
 import { runAgent } from './runtime'
 import { isTaskToolEligible } from './taskActionRegistry'
-import { parseLiveStatusIntent } from './liveStatusIntent'
+import { parseLiveStatusIntent } from '../../../domain/liveStatusIntent'
 import { liveStatusReply } from './liveStatusReply'
 import type { AgentModelProvider, AgentModelResponse, AgentModelRequest } from './types'
 

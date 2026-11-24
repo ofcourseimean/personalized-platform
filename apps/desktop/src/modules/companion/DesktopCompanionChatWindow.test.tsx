@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { emptyCompanionDesktopSnapshot } from './companionDesktop'
 import { DesktopCompanionChatWindow } from './DesktopCompanionChatWindow'
+import { setPrivateConversation } from './conversationPrivacy'
 import type { AgentTask } from '../../domain/models'
 const events = vi.hoisted(() => ({ handlers: new Map<string, Set<(event: { payload: unknown }) => void>>(), emit: vi.fn().mockResolvedValue(undefined) }))
 vi.mock('@tauri-apps/api/event', () => ({
@@ -19,6 +20,27 @@ const task = (status: AgentTask['status']): AgentTask => ({ id: 'recording', tit
 describe('lightweight conversation', () => {
   beforeEach(() => { events.handlers.clear(); events.emit.mockClear(); Element.prototype.scrollIntoView = vi.fn(); Object.defineProperty(window, '__TAURI_INTERNALS__', { value: {}, configurable: true }) })
   afterEach(() => { Reflect.deleteProperty(window, '__TAURI_INTERNALS__') })
+  it('switches lanes from the header without moving messages between them', async () => {
+    setPrivateConversation(true)
+    render(<DesktopCompanionChatWindow />)
+    await waitFor(() => expect(events.handlers.has('companion:snapshot')).toBe(true))
+    send('companion:chat-presentation', { mode: 'full' })
+    send('companion:snapshot', { ...emptyCompanionDesktopSnapshot, messages: [
+      { id: 'local', role: 'companion', content: '本地留言', syncScope: 'local', createdAt: '' },
+      { id: 'shared', role: 'companion', content: '普通留言', syncScope: 'shared', createdAt: '' },
+    ] })
+    const toggle = screen.getByRole('button', { name: '仅本机会话' })
+    expect(toggle.closest('header')).toBeTruthy()
+    expect(toggle).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByText('本地留言')).toBeInTheDocument()
+    expect(screen.queryByText('普通留言')).not.toBeInTheDocument()
+    fireEvent.click(toggle)
+    expect(toggle).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByText('普通留言')).toBeInTheDocument()
+    expect(screen.queryByText('本地留言')).not.toBeInTheDocument()
+    fireEvent.click(toggle)
+    expect(screen.getByText('本地留言')).toBeInTheDocument()
+  })
   it('shows private transient replies after streams clear and removes them for a new conversation',async()=>{
     render(<DesktopCompanionChatWindow />)
     await waitFor(()=>expect(events.handlers.has('companion:transient-message')).toBe(true))

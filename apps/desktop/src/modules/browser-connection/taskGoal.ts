@@ -39,7 +39,7 @@ function explicitSites(message: string) {
   return { sites: [...found], invalid }
 }
 export function resolveBrowserTask(message: string, companion: CompanionData): BrowserTaskGoal | undefined {
-  const objective = browserObjective(message)
+  const objective = browserObjective(message, companion.name)
   if (!objective) return
   const sites = companion.browser?.sites ?? [], parsed = explicitSites(message), explicit = parsed.sites
   if (parsed.invalid) return { objective, origins: [], candidates: [], clarification: '请提供不带账号、密码或端口的HTTPS页面链接；不会从无效链接回退猜测其他账号。' }

@@ -93,8 +93,13 @@ export function CompanionPanel() {
   resume.current=goal=>{if(activeTurn.current||busy)return false;void send(goal);return true}
   useEffect(()=>receiveBrowserHandoff('main',goal=>resume.current(goal)),[])
   return <section className="companion-panel context-section">
-    <header><div><span className={`companion-avatar ${data.companion.expression} hair-${data.companion.appearance.hair} outfit-${data.companion.appearance.outfit}`}>隅</span><span><strong>{data.companion.name}</strong><small>{context.activeChapter?.title ?? context.activeWork?.title ?? '未授权任何创作上下文'}</small></span></div>{savedMessages.length + transientMessages.length > 0 && <button aria-label="清空伙伴对话" onClick={() => { if (!privateSession && !window.confirm('清空普通会话？删除会同步到已配对设备；仅本机会话保留。')) return; clearCompanionMessages(privateSession ? 'local' : 'ordinary'); setTransientMessages([]) }}><Trash2 size={13} /></button>}</header>
-    <ConversationPrivacyToggle disabled={busy} />
+    <header>
+      <div className="companion-panel-identity"><span className={`companion-avatar ${data.companion.expression} hair-${data.companion.appearance.hair} outfit-${data.companion.appearance.outfit}`}>隅</span><span><strong>{data.companion.name}</strong><small>{context.activeChapter?.title ?? context.activeWork?.title ?? '未授权任何创作上下文'}</small></span></div>
+      <div className="companion-panel-actions">
+        <ConversationPrivacyToggle disabled={busy} />
+        {savedMessages.length + transientMessages.length > 0 && <button aria-label="清空伙伴对话" onClick={() => { if (!privateSession && !window.confirm('清空普通会话？删除会同步到已配对设备；仅本机会话保留。')) return; clearCompanionMessages(privateSession ? 'local' : 'ordinary'); setTransientMessages([]) }}><Trash2 size={13} /></button>}
+      </div>
+    </header>
     {encryptedNeedsGrant && <button className="temporary-grant" onClick={() => grantTemporaryCompanionWork(work!.id, true)}><LockKeyhole size={13} />仅本次解锁会话允许读取《{work!.title}》</button>}
     {hasTemporaryGrant && work?.encrypted && <button className="temporary-grant" onClick={() => grantTemporaryCompanionWork(work.id, false)}><LockKeyhole size={13} />撤销本次会话的文稿读取权限</button>}
     {task && <AgentTaskCard task={task} onPause={() => pauseAgentTask(task.id)} onResume={() => resumeAgentTask(task.id)} onConfirm={() => confirmAgentTaskStep(task.id)} onCancel={() => cancelAgentTask(task.id)} />}

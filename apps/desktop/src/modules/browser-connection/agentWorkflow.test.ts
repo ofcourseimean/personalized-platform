@@ -1,5 +1,6 @@
 import { afterEach,beforeEach,expect,it,vi } from 'vitest'
 import { createSeedLibrary } from '../../domain/seed'
+import { bilibiliSetupSites } from '../../domain/browser'
 import { useLibraryStore } from '../../state/useLibraryStore'
 import { sendCompanionTurn } from '../companion/companionConversation'
 import { browserDateRange } from './parameters'
@@ -16,6 +17,28 @@ beforeEach(()=>{
   useLibraryStore.setState({data})
 })
 afterEach(()=>vi.unstubAllGlobals())
+it('checks the named streamer through public tools with all five Bilibili domains connected', async () => {
+  const data = useLibraryStore.getState().data
+  data.companion.browser!.sites = [...bilibiliSetupSites]
+  data.companion.permissions.internet = true
+  const anchorName = '天才美少女卡莎'
+  const roomUrl = 'https://live.bilibili.com/1733394496'
+  mock.native.mockImplementation(async (command, args) => {
+    if (command === 'web_search') {
+      expect(args.query).toBe(`B站 "${anchorName}" 直播间`)
+      return [{ title: `${anchorName} - 哔哩哔哩直播`, url: roomUrl, snippet: '与实时状态无关的搜索摘要' }]
+    }
+    expect(command).toBe('public_web_live_status')
+    expect(args).toMatchObject({ roomUrl, expectedName: anchorName })
+    return { roomUrl, anchorName, status: 'live', fetchedAtEpochMs: Date.now(), sourceUrls: [], untrusted: true }
+  })
+  const reply = await sendCompanionTurn('看看B站天才美少女卡莎开播了没')
+  expect(mock.native.mock.calls.map(([command]) => command)).toEqual(['web_search', 'public_web_live_status'])
+  expect(mock.generate).not.toHaveBeenCalled()
+  expect(reply).toMatch(/^「天才美少女卡莎」正在直播。/)
+  expect(reply).not.toMatch(/目标网站|搜索摘要|https:/)
+})
+
 it('plans model-interpreted dates and sorting through normal tools without sending page bodies or native parameter provenance',async()=>{
   let phase=0
   mock.native.mockImplementation(async(name,args)=>{

@@ -228,8 +228,13 @@
 .companion-compose textarea { min-height: 62px; padding: 9px; font: 11px/1.55 var(--serif); }
 .companion-compose button { width: 36px; min-height: 36px; }
 .companion-error { font-size: 9px; line-height: 1.5; }
-.companion-panel > header > button { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 8px; }
-.companion-panel > header > button:hover { color: #a9534d; background: color-mix(in srgb, #a9534d 9%, transparent); }
+.companion-panel-identity { min-width: 0; }
+.companion-panel-identity > span { min-width: 0; }
+.companion-panel-identity > .companion-avatar { flex: none; }
+.companion-panel-identity :is(strong, small) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.companion-panel > header > .companion-panel-actions { flex: none; gap: 3px; }
+.companion-panel-actions > button { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 8px; }
+.companion-panel-actions > button:hover { color: #a9534d; background: color-mix(in srgb, #a9534d 9%, transparent); }
 .companion-drawer-trigger,.companion-drawer-backdrop { display: none; }
 
 @media (max-width: 1020px) {

@@ -2,7 +2,7 @@ import { DEFAULT_COMPANION_NAME, stripCompanionAddress } from '../../../domain/c
 import type { AgentToolCall, AgentToolDefinition } from './types'
 import { resolveRitualAction } from './ritualIntent'
 import { parseLiveRoomIntent } from './liveRoomIntent'
-import { parseLiveStatusIntent } from './liveStatusIntent'
+import { parseLiveStatusIntent } from '../../../domain/liveStatusIntent'
 
 export interface AgentActionIntent {
   expectsTool: boolean
