@@ -266,7 +266,9 @@ export function createLiveCompanionApplicationServices(
       const updated = useLibraryStore.getState()
       return { action, playing: updated.playback.playing, trackId: updated.data.session.currentTrackId, player: 'yiyu-local' }
     },
-    computer: createComputerService(data.companion.computer),
+    computer: {
+      execute: (request, confirmed) => createComputerService(useLibraryStore.getState().data.companion.computer).execute(request, confirmed),
+    },
     searchWeb: async (query) => searchWeb(await protectOutboundText(query, {
       trust: data.settings.trust,
       destination: data.settings.webSearch.providerId === 'tencent' ? '腾讯云联网搜索' : data.settings.webSearch.providerId === 'bocha' ? '博查联网搜索' : 'Bing Search',

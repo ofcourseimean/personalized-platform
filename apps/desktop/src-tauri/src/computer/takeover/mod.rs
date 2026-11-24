@@ -62,7 +62,8 @@ pub fn execute(runtime: &ComputerRuntime, policy: &ComputerPolicy, request: Requ
         if session.mode != "control" { return Err("TAKEOVER_READ_ONLY_SESSION".into()); }
         if session.actions >= 8 { return Err("TAKEOVER_ACTION_LIMIT".into()); }
         if *revision != session.revision { return Err("TAKEOVER_STALE_OBSERVATION".into()); }
-        if !matches!(operation.as_str(), "fill" | "invoke") { return Err("TAKEOVER_OPERATION_INVALID".into()); }
+        if !matches!(operation.as_str(), "fill" | "invoke" | "select" | "expand" | "collapse" | "scroll_down" | "scroll_up")
+            || (operation != "fill" && !text.is_empty()) { return Err("TAKEOVER_OPERATION_INVALID".into()); }
         policy::validate_text(text)?;
     }
     let (hwnd, info, owner_created) = target::resolve(&session.window_id)?;
@@ -89,6 +90,13 @@ pub fn execute(runtime: &ComputerRuntime, policy: &ComputerPolicy, request: Requ
             if operation == "invoke" && !actual.can_invoke { return Err("TAKEOVER_INVOKE_UNSUPPORTED".into()); }
             if operation == "invoke" && !policy::auto_invoke(&actual.name) && !confirmed { return Err("TAKEOVER_ACTION_CONFIRMATION_REQUIRED:请确认这个按钮的实际作用".into()); }
             if operation == "fill" && !policy::auto_fill(&actual.name, &actual.automation_id) && !confirmed { return Err("TAKEOVER_ACTION_CONFIRMATION_REQUIRED:普通输入框的用途需你确认".into()); }
+            match operation.as_str() {
+                "select" if expected.selected != actual.selected || actual.selected.is_none() => return Err("TAKEOVER_ELEMENT_CHANGED".into()),
+                "select" if !confirmed => return Err("TAKEOVER_ACTION_CONFIRMATION_REQUIRED:请确认要选择的项目".into()),
+                "expand" | "collapse" if expected.expanded != actual.expanded || actual.expanded.is_none() => return Err("TAKEOVER_ELEMENT_CHANGED".into()),
+                "scroll_down" | "scroll_up" if !expected.can_scroll || !actual.can_scroll => return Err("TAKEOVER_OPERATION_UNSUPPORTED".into()),
+                _ => {}
+            }
             policy::validate_text(&text)?;
             // Consume before dispatch: a timeout or partial effect must never replay this observation.
             session.actions += 1; session.controls.clear(); session.revision += 1;

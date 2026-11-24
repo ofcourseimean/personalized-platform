@@ -2,6 +2,7 @@ use serde::Serialize;
 use std::{
     fs,
     path::{Path, PathBuf},
+    time::{Duration, Instant},
 };
 
 use super::{policy::target_allowed, types::ComputerPolicy};
@@ -91,15 +92,77 @@ pub fn list(policy: &ComputerPolicy, path: &str, recursive: bool, confirmed: boo
 }
 
 pub fn search(policy: &ComputerPolicy, path: &str, query: &str, confirmed: bool) -> Result<Vec<FileEntry>, String> {
+    Ok(scan(policy, path, query, false, confirmed)?.entries)
+}
+
+#[derive(Serialize)]
+pub struct SearchResult {
+    pub entries: Vec<FileEntry>,
+    pub complete: bool,
+}
+
+pub fn scan(policy: &ComputerPolicy, path: &str, query: &str, directories_only: bool, confirmed: bool) -> Result<SearchResult, String> {
     let needle = query.trim().to_lowercase();
-    if needle.is_empty() {
+    if needle.is_empty() || needle.len() > 512 {
         return Err("FILE_SEARCH_INVALID:搜索词不能为空".into());
     }
-    Ok(list(policy, path, true, confirmed)?
-        .into_iter()
-        .filter(|item| item.name.to_lowercase().contains(&needle))
-        .take(MAX_RESULTS)
-        .collect())
+    let root = guard(policy, "file_read", path, confirmed)?;
+    if !root.is_dir() {
+        return Err("FILE_LIST_NOT_DIRECTORY:目标不是目录".into());
+    }
+    let mut entries = Vec::new();
+    if directories_only && root.file_name().is_some_and(|name| name.to_string_lossy().to_lowercase().contains(&needle)) {
+        let mut folder = entry(root.clone())?;
+        folder.path = display_path(&root);
+        entries.push(folder);
+    }
+    let deadline = Instant::now() + Duration::from_secs(2);
+    let mut pending = vec![root.clone()];
+    let mut visited = 0;
+    let mut complete = true;
+    while let Some(directory) = pending.pop() {
+        let Ok(children) = fs::read_dir(directory) else { complete = false; continue };
+        for child in children {
+            visited += 1;
+            if visited > 20_000 || Instant::now() >= deadline || entries.len() >= MAX_RESULTS {
+                return Ok(SearchResult { entries, complete: false });
+            }
+            let Ok(child) = child else { complete = false; continue };
+            let path = child.path();
+            let Ok(meta) = fs::symlink_metadata(&path) else { complete = false; continue };
+            #[cfg(windows)]
+            {
+                use std::os::windows::fs::MetadataExt;
+                // Junctions and other reparse points can leave the authorized tree.
+                if meta.file_attributes() & 0x400 != 0 { continue }
+            }
+            if meta.file_type().is_symlink() || sensitive(&path)
+                || (!confirmed && !target_allowed(policy, "file_read", &path.to_string_lossy()))
+            { continue }
+            if meta.is_dir() {
+                let Ok(resolved) = path.canonicalize() else { complete = false; continue };
+                if resolved.starts_with(&root) && !sensitive(&resolved)
+                    && (confirmed || target_allowed(policy, "file_read", &resolved.to_string_lossy())) {
+                    pending.push(resolved);
+                } else { continue }
+            }
+            if (!directories_only || meta.is_dir()) && child.file_name().to_string_lossy().to_lowercase().contains(&needle) {
+                entries.push(FileEntry {
+                    name: child.file_name().to_string_lossy().into_owned(),
+                    path: display_path(&path),
+                    is_directory: meta.is_dir(),
+                    size: if meta.is_file() { meta.len() } else { 0 },
+                });
+            }
+        }
+    }
+    Ok(SearchResult { entries, complete })
+}
+
+pub fn display_path(path: &Path) -> String {
+    let value = path.to_string_lossy();
+    if let Some(unc) = value.strip_prefix(r"\\?\UNC\") { return format!(r"\\{unc}") }
+    value.strip_prefix(r"\\?\").unwrap_or(&value).to_owned()
 }
 
 pub fn read_text(policy: &ComputerPolicy, path: &str, confirmed: bool) -> Result<String, String> {
@@ -141,5 +204,37 @@ pub fn delete(policy: &ComputerPolicy, path: &str, confirmed: bool) -> Result<()
         fs::remove_dir(target).map_err(|error| format!("FILE_DELETE_DIRECTORY:{error}"))
     } else {
         fs::remove_file(target).map_err(|error| format!("FILE_DELETE:{error}"))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::computer::types::ComputerGrant;
+
+    #[test]
+    fn searches_past_the_list_limit_and_honors_denied_subtrees() {
+        let root = std::env::temp_dir().join(format!("yiyu-folder-{}", std::process::id()));
+        fs::create_dir(&root).unwrap();
+        let outcome = (|| {
+            for index in 0..220 { fs::write(root.join(format!("item-{index:03}")), "test").unwrap(); }
+            let hidden = root.join("private");
+            fs::create_dir_all(hidden.join("家教")).unwrap();
+            fs::create_dir(root.join("家教")).unwrap();
+            let policy = ComputerPolicy {
+                enabled:true, profile:"custom".into(), ffmpeg_path:String::new(), recording_directory:String::new(),
+                grants: [(root.as_path(),"allow"),(hidden.as_path(),"deny")].into_iter().map(|(path, mode)| ComputerGrant {
+                    capability:"file_read".into(), target_kind:"directory".into(), target:path.to_string_lossy().into_owned(), mode:mode.into(),
+                }).collect(),
+            };
+            scan(&policy, &root.to_string_lossy(), "家教", true, false)
+        })();
+        let cleanup = fs::remove_dir_all(&root);
+        let result = outcome.unwrap();
+        cleanup.unwrap();
+        assert!(result.complete);
+        assert_eq!(result.entries.len(), 1);
+        assert_eq!(result.entries[0].name, "家教");
+        assert!(!result.entries[0].path.contains("private"));
     }
 }

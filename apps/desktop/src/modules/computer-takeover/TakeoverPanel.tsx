@@ -55,7 +55,7 @@ export function TakeoverPanel() {
       <label>操作哪个窗口<div className="takeover-target"><select required aria-label="接管窗口" value={target} onChange={event => { setTarget(event.target.value); setConsent(false) }}><option value="">先读取窗口列表，再选择</option>{windows.map(item => <option key={item.windowId} value={item.windowId}>{item.title}</option>)}</select><button type="button" onClick={() => void refresh()}>刷新</button></div></label>
       <label>希望她做什么<textarea readOnly={Boolean(operation)} required maxLength={2000} rows={2} value={goal} onChange={event => { setGoal(event.target.value); setConsent(false) }} placeholder="例如：在这个窗口搜索‘阅读报告’，不要发送或提交。" /></label>
       {operation && <p className="takeover-hint">按选定方法重新观察。方法不能授权账号或扩大本次窗口范围；要改目标请返回方法库修改。</p>}
-      <label className="takeover-choice"><input type="checkbox" checked={control} onChange={event => { setControl(event.target.checked); setConsent(false) }} />允许普通填写与搜索；不勾选只观察</label>
+      <label className="takeover-choice"><input type="checkbox" checked={control} onChange={event => { setControl(event.target.checked); setConsent(false) }} />允许填写、搜索和操作普通控件</label>
       <label className="takeover-choice"><input type="checkbox" checked={consent} onChange={event => setConsent(event.target.checked)} />同意本任务的控件文字发送给已配置的 DeepSeek；不发送截图，已标记的密码框会排除</label>
       <p className="takeover-hint">最长3分钟、最多8次操作。提交、发送、保存、删除等需你手动处理；不接管管理员窗口、终端或一隅自身。</p>
       <button className="primary-button" type="submit" disabled={!settings.enabled || !target || !goal.trim() || !consent}><Play size={13} />开始本次任务</button>

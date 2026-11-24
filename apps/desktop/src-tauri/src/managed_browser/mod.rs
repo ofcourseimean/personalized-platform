@@ -1,4 +1,5 @@
 mod assets;
+mod attachment;
 mod job;
 mod worker;
 mod policy;
@@ -76,7 +77,12 @@ pub async fn managed_browser_request(app:AppHandle,window:WebviewWindow,runtime:
     let runtime=runtime.inner.clone();
     tauri::async_runtime::spawn_blocking(move||{
         let data=execute(&app,&runtime,expected_epoch,json!({"kind":"request","request":request}))?;
-        result::validate_managed(&request,data)
+        let mut result=result::validate_managed(&request,data)?;
+        if request.interaction.as_ref().is_some_and(|action|action.operation=="download"){
+            if runtime.epoch.load(Ordering::SeqCst)!=expected_epoch{return Err("BROWSER_CANCELLED:".into())}
+            attachment::verify(&assets::root(&app)?,&mut result)?;
+        }
+        Ok(result)
     }).await.map_err(|_|"BROWSER_RUNTIME:".to_string())?
 }
 #[tauri::command]

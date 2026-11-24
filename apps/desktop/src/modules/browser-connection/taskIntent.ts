@@ -17,6 +17,6 @@ export function browserObjective(message: string): BrowserObjective | undefined 
   if (bili.test(message) && live.test(message) && !publicLive.test(message)
     && (account.test(message) || quantifiedGroup.test(message) || upGroup.test(message) && whoLive.test(message))) return 'followed_live'
   if (/(?:邮箱|邮件|收件箱|email|mail|inbox)/iu.test(message) && action.test(message) && !/(?:发送|发一封|写一封|删除|清空)/u.test(message)) return 'mail'
-  if (action.test(message)) return 'page'
+  if (action.test(message) || /下载|download/iu.test(message)) return 'page'
 }
 export function followedLiveIntent(message: string) { return browserObjective(message) === 'followed_live' }

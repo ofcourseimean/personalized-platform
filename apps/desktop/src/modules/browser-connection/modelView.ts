@@ -1,4 +1,5 @@
 import type { AgentModelRequest } from '../companion/agent/types'
+import { attachmentDate } from './attachmentSelection'
 
 // Fixed vocabulary only. A name may contain a private subject/account even
 // after conventional redaction, so never forward its unrecognized remainder.
@@ -24,7 +25,8 @@ function pageView(value:unknown,content=false,goal=''){
   return {tabId:page.tabId,origin:page.origin,observationId:page.observationId,title:'授权页面',text:content&&typeof page.text==='string'?page.text.slice(0,2000):statisticalEvidence(page.text),loading:page.loading,truncated:page.truncated,loginState:page.loginState,
     controls:controls.map((value,index)=>{
       const control=object(value),name=String(control.name??''),choices=control.operation==='select'&&name.includes('（')&&name.endsWith('）')?name.slice(name.indexOf('（')+1,-1).split('、').slice(0,20).map((option,index)=>({value:`option:${index}`,label:controlLabel(option,index),matchesRequest:matchesRequest(option,goal)})):undefined
-      return {id:control.id,operation:control.operation,name:controlLabel(name,index),matchesRequest:matchesRequest(name,goal),...(choices?{choices}:{})}
+      const documentDate=control.operation==='download'?attachmentDate(name):undefined
+      return {id:control.id,operation:control.operation,name:control.operation==='download'?`附件 ${index+1}`:controlLabel(name,index),matchesRequest:matchesRequest(name,goal),...(documentDate?{documentDate}:{}),...(choices?{choices}:{})}
     }),privacyView:content?'reviewed_excerpt':'controls_and_statistics',bodyWithheld:!content}
 }
 function envelopeView(value:unknown,goal:string){

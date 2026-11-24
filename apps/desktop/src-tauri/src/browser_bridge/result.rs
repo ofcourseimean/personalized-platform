@@ -16,7 +16,27 @@ struct Page { tab_id: u64, origin: String, title: String, url: String, text: Str
 struct Control {id:String,name:String,operation:String}
 #[derive(Deserialize,Serialize)]
 #[serde(rename_all="camelCase",deny_unknown_fields)]
-struct Action {tab_id:u64,origin:String,action_status:String,#[serde(default,skip_serializing_if="Option::is_none")]next_tab_id:Option<u64>}
+struct Action {
+    tab_id:u64,
+    origin:String,
+    action_status:String,
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    next_tab_id:Option<u64>,
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    attachment:Option<Attachment>,
+}
+#[derive(Deserialize,Serialize)]
+#[serde(deny_unknown_fields)]
+struct Attachment { id:String, name:String, bytes:u64 }
+impl Attachment {
+    fn valid(&self)->bool{
+        reference(&self.id)&&self.name.starts_with("网页-")
+            &&self.name.chars().count()<=85
+            &&self.name.chars().all(|ch|ch.is_alphanumeric()||" _().-".contains(ch))
+            &&self.name.rsplit_once('.').is_some_and(|(_,ext)|["pdf","docx","xlsx","pptx"].contains(&ext))
+            &&(6..=16*1024*1024).contains(&self.bytes)
+    }
+}
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all="snake_case")]
 enum LoginState { NotAllowed, Unfilled, NeedsUser, Continued, Pending, SubmitRejected, ManagedLogin, ManagedUnfilled, ManagedNeedsUser, ManagedPending }
@@ -47,14 +67,18 @@ fn validate_inner(request:&Request,value:Value,managed:bool)->Result<Value,Strin
             let page: Page = serde_json::from_value(value).map_err(|_| invalid)?;
             if !managed && matches!(page.login_state,Some(LoginState::ManagedLogin|LoginState::ManagedUnfilled|LoginState::ManagedNeedsUser|LoginState::ManagedPending)){return Err(invalid.into())}
             if !request.cached_login && matches!(page.login_state, Some(LoginState::Continued | LoginState::Pending | LoginState::SubmitRejected|LoginState::ManagedUnfilled|LoginState::ManagedNeedsUser|LoginState::ManagedPending)) { return Err(invalid.into()); }
-            let operations:&[&str]=if managed{&["invoke","search","fill","select","scroll"]}else{&["invoke","search"]};
+            let operations:&[&str]=if managed{&["invoke","search","fill","select","scroll","download"]}else{&["invoke","search"]};
             if page.observation_id.as_ref().is_some_and(|id|!reference(id))||page.controls.len()>60||page.controls.iter().any(|control|!reference(&control.id)||!text(&control.name,100)||!operations.contains(&control.operation.as_str()))||!page.controls.is_empty()&&page.observation_id.is_none(){return Err(invalid.into())}
             if Some(page.tab_id) != request.tab_id || page.origin != request.origin || !safe_url(&page.url, Some(&request.origin)) || !text(&page.title, 200) || !text(&page.text, 12000) || page.links.len() > 40 || page.links.iter().any(|link| !text(&link.text, 100) || !safe_url(&link.url, None)) { return Err(invalid.into()); }
             serde_json::to_value(page)
         },
         "act" => {
             let action:Action=serde_json::from_value(value).map_err(|_|invalid)?;
-            if Some(action.tab_id)!=request.tab_id||action.origin!=request.origin||!["dispatched","stale","blocked"].contains(&action.action_status.as_str())||action.next_tab_id.is_some_and(|id|!managed||id==0||id>9007199254740991||Some(id)==request.tab_id||action.action_status!="dispatched"){return Err(invalid.into())}
+            if Some(action.tab_id)!=request.tab_id||action.origin!=request.origin{return Err(invalid.into())}
+            let download=request.interaction.as_ref().is_some_and(|value|value.operation=="download");
+            if download {
+                if !managed||action.action_status!="downloaded"||action.next_tab_id.is_some()||!action.attachment.as_ref().is_some_and(Attachment::valid){return Err(invalid.into())}
+            } else if action.attachment.is_some()||!["dispatched","stale","blocked"].contains(&action.action_status.as_str())||action.next_tab_id.is_some_and(|id|!managed||id==0||id>9007199254740991||Some(id)==request.tab_id||action.action_status!="dispatched"){return Err(invalid.into())}
             serde_json::to_value(action)
         },
         "followed_live" => {

@@ -6,6 +6,7 @@ import { createPrivacyProtectedProvider, PrivacySession, type PrivacyReviewReque
 import { AgentPermissionEngine, buildAgentAccess, buildAgentContext, createCompanionToolRegistry, runAgent } from './agent'
 import type { AgentPermissionRequest, AgentRuntimeStatus } from './agent/types'
 import { resolveDirectAction } from './agent/directActions'
+import { clearFolderChoice, prepareFolderFlow } from './agent/folderFlow'
 import { localRitualTools } from './agent/ritualTools'
 import { resolveBrowserTask } from '../browser-connection/taskGoal'
 import { prepareOperationTurn, finishOperationTurn, offerOperationTraining } from '../operation-memory/turn'
@@ -44,9 +45,11 @@ export async function sendCompanionTurn(message: string, options: CompanionTurnO
   const { data, temporaryCompanionWorkIds } = store
   const privateSession = privateConversation()
   const channel=options.conversationChannel??'main'
-  const prepared=operation?undefined:prepareBrowserTurn(userText,data.companion,channel)
+  const folderChannel = `${channel}:${privateSession ? 'private' : 'ordinary'}`
+  const folderFlow = operation ? undefined : prepareFolderFlow(userText, data.companion.computer, folderChannel)
+  const prepared=operation?undefined:prepareBrowserTurn(userText,data.companion,folderChannel)
   const clean=prepared?.message??userText
-  if (!privateSession) new PrivacySession([]).sanitize(clean)
+  if (!privateSession && !folderFlow) new PrivacySession([]).sanitize(clean)
   const taskText = operation?.goal ?? clean
   const privateBrowserQuery = Boolean(resolveBrowserTask(taskText, data.companion)) || operation?.scope === 'browser'
   const displayTransient = (role: CompanionMessage['role'], content: string) => {
@@ -54,11 +57,11 @@ export async function sendCompanionTurn(message: string, options: CompanionTurnO
     const item: CompanionMessage = { id: `transient-${crypto.randomUUID()}`, role, content, createdAt: new Date().toISOString(), localOnly: true }
     options.onTransientMessage?.(item)
   }
-  if (!options.resumeBrowserTask&&(operation || privateBrowserQuery || !data.settings.trust.retainConversationHistory)) displayTransient('user', userText)
+  if (!options.resumeBrowserTask&&(operation || folderFlow || privateBrowserQuery || !data.settings.trust.retainConversationHistory)) displayTransient('user', userText)
   const access = buildAgentAccess(data, temporaryCompanionWorkIds)
   const registry = createCompanionToolRegistry(options.onVisualState)
   const localAction = resolveDirectAction(taskText, registry.definitions(), data.companion.name)
-  if (!localAction || !localRitualTools.has(localAction.name)) assertExternalAiAllowed(data.companion.provider.providerId, data.settings.trust, 'companion')
+  if (!folderFlow && (!localAction || !localRitualTools.has(localAction.name))) assertExternalAiAllowed(data.companion.provider.providerId, data.settings.trust, 'companion')
   const fullContext = applyContextPrivacy(buildAgentContext(data, access), data.settings.trust)
   // Shared conversation never implicitly attaches local documents or memories.
   // Any actual tool use keeps the entire turn local, even in ordinary mode.
@@ -77,7 +80,7 @@ export async function sendCompanionTurn(message: string, options: CompanionTurnO
     }
   })
   const contextSummary = [context.activeWork?.title, context.activeChapter?.title].filter(Boolean).join('、') || '未授权作品或章节'
-  const history = operation || privateBrowserQuery ? [] : applyHistoryPrivacy(data.companion.messages.filter((item) => !item.localOnly && (privateSession ? inConversationLane(item, true) : item.syncScope === 'shared')).slice(-8).map((item) => ({
+  const history = operation || folderFlow || privateBrowserQuery ? [] : applyHistoryPrivacy(data.companion.messages.filter((item) => !item.localOnly && (privateSession ? inConversationLane(item, true) : item.syncScope === 'shared')).slice(-8).map((item) => ({
     role: item.role === 'companion' ? 'assistant' as const : 'user' as const,
     content: item.content,
   })), data.settings.trust)
@@ -99,7 +102,7 @@ export async function sendCompanionTurn(message: string, options: CompanionTurnO
     options.onStatus?.(status)
   }
   const pendingUser: CompanionMessage = { id: `message-${crypto.randomUUID()}`, role: 'user', content: clean, createdAt: new Date().toISOString(), contextSummary, syncScope: privateSession ? 'local' : 'ordinary-local', localOnly: Boolean(localAction && localRitualTools.has(localAction.name)) }
-  if (!operation && !privateBrowserQuery && data.settings.trust.retainConversationHistory) store.addCompanionMessage(pendingUser)
+  if (!operation && !folderFlow && !privateBrowserQuery && data.settings.trust.retainConversationHistory) store.addCompanionMessage(pendingUser)
   try {
     const result = await runAgent({
       message: clean,
@@ -139,15 +142,16 @@ export async function sendCompanionTurn(message: string, options: CompanionTurnO
       signal: options.signal,
       assertAllowed: assertBrowserAllowed,
       operation,
+      folderFlow,
     })
     if (operation) finishOperationTurn(result, options.onOperationReceipt)
-    else offerOperationTraining(clean, result)
+    else if (!folderFlow) offerOperationTraining(clean, result)
     if(data.companion.operationLearning?.enabled!==false&&prepared?.resolvedFromClarification&&prepared.task?.origins.length===1&&result.audit.some(item=>item.toolName==='browser.verify'&&item.resultStatus==='success')){
       const role=prepared.task.objective==='mail'?'mail':prepared.task.objective==='page'&&/(?:通知|公告|门户)/u.test(clean)?'portal':undefined
       if(role)useLibraryStore.getState().setCompanionBrowser({preferredSites:{...useLibraryStore.getState().data.companion.browser?.preferredSites,[role]:prepared.task.origins[0]}})
     }
-    if(!operation&&!options.signal?.aborted)rememberBrowserTurn(prepared?.task,useLibraryStore.getState().data.companion,channel,clean)
-    const transientReply = operation || privateBrowserQuery || result.audit.some(entry => entry.toolName.startsWith('browser.') && entry.toolName !== 'browser.status') || !data.settings.trust.retainConversationHistory
+    if(!operation&&!options.signal?.aborted&&(!prepared?.task?.downloadAllowed||result.execution.phase==='clarifying'))rememberBrowserTurn(prepared?.task,useLibraryStore.getState().data.companion,folderChannel,clean)
+    const transientReply = operation || folderFlow || privateBrowserQuery || result.audit.some(entry => entry.toolName.startsWith('browser.') && entry.toolName !== 'browser.status') || !data.settings.trust.retainConversationHistory
     if (transientReply) displayTransient('companion', result.text)
     else if (!options.signal?.aborted) {
       let shared = !privateSession && !result.audit.length && !pendingUser.localOnly
@@ -160,7 +164,7 @@ export async function sendCompanionTurn(message: string, options: CompanionTurnO
     if(handoff&&!browserVerified&&!operation&&!options.signal?.aborted)armBrowserHandoff(channel,clean,handoff.origin,handoff.epoch)
     return result.text
   } finally {
-    if(options.signal?.aborted)forgetBrowserTurn(channel)
+    if(options.signal?.aborted){forgetBrowserTurn(folderChannel);clearFolderChoice(folderChannel)}
     globalThis.clearTimeout(thinkingTimer)
     options.onStatus?.(undefined)
   }

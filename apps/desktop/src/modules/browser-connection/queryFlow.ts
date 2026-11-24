@@ -19,13 +19,14 @@ export class BrowserQueryFlow {
   constructor(task: BrowserTaskGoal, message: string) { this.task = task; this.message = message }
   get initialCall(): AgentToolCall | undefined {
     if (this.task.clarification || this.task.objective === 'followed_live' || this.task.origins.length !== 1) return
-    return this.call('browser.tabs', { origin: this.task.origins[0] })
+    this.prepared = Boolean(this.task.explicitPage)
+    return this.call(this.prepared ? 'browser.ensure_page' : 'browser.tabs', { origin: this.task.origins[0] })
   }
   advance(call: AgentToolCall, result: AgentToolResult): { nextCall?: AgentToolCall; reply?: string } | undefined {
     if(call.name==='browser.collect'||call.name==='browser.read_content'){this.requiresVerification=true;return}
     if (!['browser.tabs','browser.ensure_page','browser.read_page','browser.observe','browser.act'].includes(call.name)) return
     const code=result.error?.browserCode
-    if(!result.success&&code==='BROWSER_PAGE_PENDING'&&this.loadingRecoveries++<1)return {nextCall:this.call('browser.observe',{origin:this.task.origins[0],tabId:(call.arguments as {tabId:number}).tabId})}
+    if(!result.success&&code==='BROWSER_PAGE_PENDING'&&['browser.read_page','browser.observe'].includes(call.name)&&this.loadingRecoveries++<1)return {nextCall:this.call('browser.observe',{origin:this.task.origins[0],tabId:(call.arguments as {tabId:number}).tabId})}
     if(call.name==='browser.act'&&!result.success&&['BROWSER_STALE','BROWSER_ACTION_BLOCKED'].includes(code??'')&&this.staleRecoveries++<2)return {nextCall:this.call('browser.observe',{origin:this.task.origins[0],tabId:(call.arguments as {tabId:number}).tabId})}
     if(call.name==='browser.act'&&!result.success&&!this.checkedUncertainAction&&result.error?.code!=='PermissionDenied'&&(!code||code==='BROWSER_ACTION_UNKNOWN')&&!/授权|权限|取消|停止|不在线|失效/u.test(result.error?.message??'')){
       this.checkedUncertainAction=true

@@ -80,7 +80,19 @@ fn execute(
     match request.action.as_str() {
         "app_list" | "window_list" => serde_json::to_value(windows::list_windows().map_err(|error| error.to_string())?).map_err(|error| error.to_string()),
         "app_open" => {
-            let target = windows::open_target(string(request, "target")?)?;
+            let raw = string(request, "target")?;
+            let folder = boolean(request, "directory", false);
+            let target = if folder {
+                let directory = files::guard(policy, "file_read", raw, false)?;
+                if !directory.is_dir() { return Err("FILE_LIST_NOT_DIRECTORY:目标不是目录".into()) }
+                let target = files::display_path(&directory);
+                let mut canonical_request = request.clone();
+                canonical_request.params.insert("target".into(), json!(target));
+                policy::authorize(policy, &canonical_request, confirmed)?;
+                windows::open_target(&target)?
+            } else {
+                windows::open_target(raw)?
+            };
             Ok(json!({ "opened": true, "target": target, "status": "submitted_to_default_handler" }))
         }
         "window_focus" => {
@@ -142,6 +154,9 @@ fn execute(
             policy, string(request, "sourcePath")?, &narration_segments(request)?),
         "media_narration_cleanup" => recording::cleanup_narration(policy, &strings(request, "paths")?),
         "file_list" => serde_json::to_value(files::list(policy, string(request, "path")?, boolean(request, "recursive", false), confirmed)?).map_err(|error| error.to_string()),
+        "file_search" if boolean(request, "directoriesOnly", false) => {
+            serde_json::to_value(files::scan(policy, string(request, "path")?, string(request, "query")?, true, false)?).map_err(|error| error.to_string())
+        }
         "file_search" => serde_json::to_value(files::search(policy, string(request, "path")?, string(request, "query")?, confirmed)?).map_err(|error| error.to_string()),
         "file_read_text" => Ok(json!({ "content": files::read_text(policy, string(request, "path")?, confirmed)? })),
         "file_write_text" => {

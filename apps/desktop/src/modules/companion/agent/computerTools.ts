@@ -39,7 +39,7 @@ export function createComputerTools(): AgentTool[] {
   return [
     tool({ name: 'computer.takeover', description: '准备受控电脑接管面板，带入用户目标。尚未开始操作；用户需选择唯一窗口、确认界面文字外发并明确点击开始。只支持有界UIA观察/普通填写与搜索，不是全电脑权限、截图看图、Shell或自动提交。', action: 'takeover_prepare', capability: 'windows', risk: 'read_only', properties: { goal: string('用户本次明确目标，不添加额外操作') }, required: ['goal'] }),
     tool({ name: 'app.list', description: '列出当前正在运行的桌面应用与窗口', action: 'app_list', capability: 'applications', risk: 'read_only' }),
-    tool({ name: 'system.open', description: '实际打开应用、文件或网页。网页可传完整 HTTPS URL 或普通域名，普通域名会在本地补全 https://；只有工具成功后才能告诉用户已打开', action: 'app_open', capability: 'applications', properties: { target: string('应用路径、文件路径、应用名、HTTPS URL 或普通域名') }, required: ['target'], targetArgument: 'target' }),
+    tool({ name: 'system.open', description: '把明确的应用、文件或网页交给 Windows 默认程序。普通域名补全 HTTPS；directory=true 时先核对已授权的本地文件夹存在。提交回执不能证明网页加载或文档已渲染。', action: 'app_open', capability: 'applications', properties: { target: string('应用路径、文件路径、应用名、HTTPS URL 或普通域名'), directory: boolean() }, required: ['target'], targetArgument: 'target' }),
     tool({ name: 'window.list', description: '列出可见窗口的标题、进程和位置', action: 'window_list', capability: 'windows', risk: 'read_only' }),
     tool({ name: 'window.focus', description: '按标题聚焦一个窗口', action: 'window_focus', capability: 'windows', properties: { title: string() }, required: ['title'], targetArgument: 'title' }),
     tool({ name: 'window.close', description: '关闭一个普通应用窗口', action: 'window_close', capability: 'windows', properties: { title: string() }, required: ['title'], targetArgument: 'title', destructive: true }),
@@ -55,7 +55,7 @@ export function createComputerTools(): AgentTool[] {
     tool({ name: 'screen.record_stop', description: '停止指定录屏并完成 MP4 文件', action: 'screen_record_stop', capability: 'screen_record', properties: { recordingId: string() }, required: ['recordingId'] }),
     tool({ name: 'screen.record_status', description: '查看当前录屏状态和输出路径', action: 'screen_record_status', capability: 'screen_record', risk: 'read_only' }),
     tool({ name: 'file.list', description: '列出已授权目录中的文件', action: 'file_list', capability: 'file_read', risk: 'read_only', properties: { path: string(), recursive: boolean() }, required: ['path'], targetArgument: 'path' }),
-    tool({ name: 'file.search', description: '在已授权目录中按文件名搜索', action: 'file_search', capability: 'file_read', risk: 'read_only', properties: { path: string(), query: string() }, required: ['path', 'query'], targetArgument: 'path' }),
+    tool({ name: 'file.search', description: '在已授权的绝对路径内按文件名搜索。directoriesOnly=true 时仅找文件夹，返回 entries 和 complete，后者为 false 表示范围未查完。禁止猜未授权路径。', action: 'file_search', capability: 'file_read', risk: 'read_only', properties: { path: string(), query: string(), directoriesOnly: boolean() }, required: ['path', 'query'], targetArgument: 'path' }),
     tool({ name: 'file.read_text', description: '读取已授权目录中的 UTF-8 文本文件', action: 'file_read_text', capability: 'file_read', risk: 'read_only', properties: { path: string() }, required: ['path'], targetArgument: 'path' }),
     tool({ name: 'file.write_text', description: '创建或覆盖已授权目录中的文本文件', action: 'file_write_text', capability: 'file_write', properties: { path: string(), content: string() }, required: ['path', 'content'], targetArgument: 'path' }),
     tool({ name: 'file.copy', description: '复制文件', action: 'file_copy', capability: 'file_write', properties: { source: string(), destination: string() }, required: ['source', 'destination'], targetArgument: 'destination' }),

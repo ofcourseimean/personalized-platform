@@ -35,10 +35,12 @@ export class LiveRoomFlow {
   private readonly canOpen: boolean
   private readonly name: string
   private readonly mode: 'open' | 'status'
+  private readonly showStatusSource: boolean
 
-  constructor(name: string, tools: AgentToolDefinition[], mode: 'open' | 'status' = 'open') {
+  constructor(name: string, tools: AgentToolDefinition[], mode: 'open' | 'status' = 'open', showStatusSource = false) {
     this.name = name
     this.mode = mode
+    this.showStatusSource = showStatusSource
     this.canOpen = tools.some(tool => tool.name === 'system.open')
     if (mode === 'status' && !tools.some(tool => tool.name === 'web.live_status')) {
       this.unavailableReply = '当前环境没有公开开播状态工具，搜索摘要不能确认实时开播。'
@@ -65,7 +67,7 @@ export class LiveRoomFlow {
   advance(call: AgentToolCall, result: AgentToolResult): FlowDecision | undefined {
     if (call.id !== this.pending?.id || call.name !== this.pending.name) return undefined
     this.pending = undefined
-    if (call.name === 'web.live_status') return { reply: liveStatusReply(result, this.name, this.target!) }
+    if (call.name === 'web.live_status') return { reply: liveStatusReply(result, this.name, this.target!, this.showStatusSource) }
     if (!result.success) {
       if (call.name === 'web.search' && this.searches === 1 && result.error?.message.startsWith('WEB_SEARCH_EMPTY:')) return { nextCall: this.search() }
       return { reply: `${call.name === 'system.open' ? '没有打开直播间' : '没有完成直播间搜索'}：${result.error?.message.slice(0, 300) || '工具执行失败'}。` }

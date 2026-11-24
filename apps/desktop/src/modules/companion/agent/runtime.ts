@@ -3,6 +3,7 @@ import type { AgentApplicationServices } from './applicationServices'
 import { AgentPermissionEngine, permissionDeniedResult } from './permission'
 import { AgentToolRegistry } from './toolRegistry'
 import { detectActionIntent } from './directActions'
+import type { FolderFlow } from './folderFlow'
 import { localRitualReply, localRitualTools } from './ritualTools'
 import { LiveRoomFlow } from './liveRoomFlow'
 import { PublicReadBudget, PUBLIC_READ_PROMPT } from './publicReadBudget'
@@ -12,6 +13,7 @@ import { followedLiveIntent } from '../../browser-connection/goal'
 import { ExecutionSession } from '../../task-kernel/session'
 import { browserTaskPrompt } from '../../browser-connection/taskGoal'
 import { BrowserQueryFlow, browserPurposeBlock } from '../../browser-connection/queryFlow'
+import { AttachmentFlow } from '../../browser-connection/attachmentFlow'
 import { followedLiveReply } from '../../browser-connection/followedReply'
 import { ReplySession } from '../replies/session'
 import { REPLY_PROMPT } from '../replies/modelReply'
@@ -59,6 +61,7 @@ export interface RunAgentInput {
   signal?: AbortSignal
   assertAllowed?(): void
   operation?: { scope: OperationScope; assertAllowed(): void }
+  folderFlow?: FolderFlow
 }
 
 function cancellationError() {
@@ -102,13 +105,16 @@ export async function runAgent(input: RunAgentInput) {
     events: [{ type: 'context', context: input.context, timestamp }, { type: 'user', content: input.message, timestamp }],
   }
   const audit: AgentAuditRecord[] = []
-  const execution=new ExecutionSession(input.services.browserTaskGoal?'browser':input.operation?.scope==='public_web'?'public_web':'application',input.services.browserTaskGoal?BROWSER_AGENT_LIMITS.requests:16)
-  const reply = new ReplySession(requestsQuerySources(input.message))
-  const finishLocal = (text: string) => {
+  const browserTask = input.services.browserTaskGoal
+  const browserSteps = BROWSER_AGENT_LIMITS.requests + (browserTask?.downloadAllowed ? 2 : 0)
+  const execution=new ExecutionSession(browserTask?'browser':input.operation?.scope==='public_web'?'public_web':'application',browserTask?browserSteps:16)
+  const showSources = requestsQuerySources(input.message)
+  const reply = new ReplySession(showSources)
+  const finishLocal = (text: string, concise = false) => {
     guard()
-    if(execution.phase!=='verified')execution.transition(input.services.browserTaskGoal?.clarification?'clarifying':'handoff')
+    if(execution.phase!=='verified'&&execution.phase!=='clarifying')execution.transition(browserTask?.clarification?'clarifying':'handoff')
     input.onStatus?.({ phase: 'responding' })
-    const formatted = reply.finish(undefined, text)
+    const formatted = concise ? text : reply.finish(undefined, text)
     session.events.push({ type: 'assistant', content: formatted, timestamp: new Date().toISOString() })
     return { text: formatted, session, audit,execution:execution.snapshot }
   }
@@ -127,13 +133,16 @@ export async function runAgent(input: RunAgentInput) {
   ]
   let toolSteps = 0
   const toolDefinitions = input.registry.definitions()
-  const browserTask = input.services.browserTaskGoal
+  const folderFlow = !browserTask && !input.operation ? input.folderFlow : undefined
+  const folderStart = folderFlow?.start()
+  if (folderStart?.reply) return finishLocal(folderStart.reply, true)
   if (!input.operation && browserTask?.clarification) return finishLocal(browserTask.clarification)
   if (browserTask) messages.push({ role: 'system', content: browserTaskPrompt(browserTask) })
   const browserFlow = !input.operation && browserTask ? new BrowserQueryFlow(browserTask, input.message) : undefined
+  const attachmentFlow = browserTask?.downloadAllowed && !input.operation ? new AttachmentFlow(input.message) : undefined
   messages.push({ role: 'system', content: OPERATION_PROMPT })
   const operationSearch = input.registry.lookup('operation.search')
-  if (!input.operation && operationSearch && input.permissions.check(operationSearch.definition, { query: input.message }).allowed) {
+  if (!folderFlow && !input.operation && operationSearch && input.permissions.check(operationSearch.definition, { query: input.message }).allowed) {
     const candidates = input.services.findOperations?.(input.message) ?? []
     experience = automaticMethodHint(input.message, candidates, input.services)
     if (input.context.page === 'browser-query' && experience?.scope !== 'browser') experience = undefined
@@ -150,7 +159,7 @@ export async function runAgent(input: RunAgentInput) {
   const actionIntent = input.operation ? { expectsTool: false } : detectActionIntent(input.message, toolDefinitions, input.context.companion.name)
   const followedQuery = !input.operation && followedLiveIntent(input.message) && Boolean(input.registry.lookup('browser.followed_live'))
   const liveName = followedQuery ? undefined : actionIntent.liveRoomName ?? actionIntent.liveStatusName
-  const liveRoomFlow = liveName ? new LiveRoomFlow(liveName, toolDefinitions, actionIntent.liveStatusName ? 'status' : 'open') : undefined
+  const liveRoomFlow = liveName ? new LiveRoomFlow(liveName, toolDefinitions, actionIntent.liveStatusName ? 'status' : 'open', showSources) : undefined
   const publicReads = new PublicReadBudget()
   const browserReads = new BrowserReadBudget(Boolean(browserTask) || input.context.page === 'browser-query' || followedQuery || input.operation?.scope === 'browser' || experience?.scope === 'browser')
   const methodWrites = new Set<string>()
@@ -160,13 +169,13 @@ export async function runAgent(input: RunAgentInput) {
   const taskPlanRequired = !followedQuery && Boolean(actionIntent.requiresTaskPlan)
   const modelToolDefinitions = (taskPlanRequired
     ? toolDefinitions.filter((tool) => tool.name === 'task.create') : toolDefinitions).filter(tool => (!input.operation || operationAllows(input.operation.scope, tool)) && (!experience || operationAllows(experience.scope, tool)) && !browserPurposeBlock(input.message, {id:'definition',name:tool.name,arguments:{}}, browserTask))
-  let directAction = browserFlow?.initialCall ?? (followedQuery ? {id:`browser-direct-${crypto.randomUUID()}`,name:'browser.followed_live',arguments:{}} : liveRoomFlow?.initialCall ?? actionIntent.directCall)
+  let directAction = folderStart?.nextCall ?? browserFlow?.initialCall ?? (followedQuery ? {id:`browser-direct-${crypto.randomUUID()}`,name:'browser.followed_live',arguments:{}} : liveRoomFlow?.initialCall ?? actionIntent.directCall)
   let actionRetryUsed = false
   let malformedToolRetryUsed = false
   let verificationRetry=false
   let answerRepairUsed = false
   let toolAttempted = false
-  const maxToolSteps = input.maxToolSteps ?? (browserTask?BROWSER_AGENT_LIMITS.requests:DEFAULT_MAX_TOOL_STEPS)
+  const maxToolSteps = input.maxToolSteps ?? (browserTask?browserSteps:DEFAULT_MAX_TOOL_STEPS)
 
   while (true) {
     guard()
@@ -215,7 +224,11 @@ export async function runAgent(input: RunAgentInput) {
     if (response.type === 'text') {
       guard()
       if(browserFlow?.requiresVerification){
-        if(!verificationRetry){verificationRetry=true;messages.push({role:'system',content:'已读取页面但任务尚无核验证据。请根据当前正文调用browser.verify，或在授权内继续观察/导航；证据不足不能假装查完。'});continue}
+        if(!verificationRetry){verificationRetry=true;messages.push({role:'system',content:attachmentFlow?'附件尚未下载。可以继续本轮授权内的操作，或只询问缺少的目标信息。不能用网页文字代替文件回执。':'已读取页面但任务尚无核验证据。请根据当前正文调用browser.verify，或在授权内继续观察/导航；证据不足不能假装查完。'});continue}
+        if(attachmentFlow){
+          execution.transition('clarifying')
+          return finishLocal('还没有下载到能确认符合要求的附件。请告诉我课程或资料名称，或提供网站里的资料页链接。',true)
+        }
         return finishLocal('已读取目标页面，但没有取得符合本次目标的核验证据，暂不能确认查询结论。没有保存私人正文或继续操作其他网站。')
       }
       if (actionIntent.expectsTool && !toolAttempted && !actionRetryUsed) {
@@ -262,7 +275,9 @@ export async function runAgent(input: RunAgentInput) {
     const scope = input.operation?.scope ?? experience?.scope
     const scopeBlock = scope && tool && !operationAllows(scope, tool.definition) ? '该工具超出本次方法的执行范围；方法不能扩大权限或启动嵌套任务' : writeKey && methodWrites.has(writeKey) ? '本次方法已尝试相同写入，不能重复；请先核对现场结果' : undefined
     const purposeBlock = browserPurposeBlock(input.message, call, browserTask)
-    const readBlock = purposeBlock ?? scopeBlock ?? browserReads.check(call, tool?.definition) ?? (trustedRoomOpen ? undefined : publicReads.check(call, tool?.definition))
+    const localDelivery = attachmentFlow?.owns(call) === true
+    const verificationBeforeDownload=attachmentFlow&&['browser.verify','browser.verify_collection'].includes(call.name)?'本轮需要下载文件，页面文字不能替代下载回执':undefined
+    const readBlock = purposeBlock ?? scopeBlock ?? verificationBeforeDownload ?? (localDelivery ? undefined : browserReads.check(call, tool?.definition) ?? (trustedRoomOpen ? undefined : publicReads.check(call, tool?.definition)))
     let decision = tool ? input.permissions.check(tool.definition, call.arguments) : { allowed: true, reason: '工具不存在，由 Registry 返回错误' }
     if (readBlock) decision = { allowed: false, reason: readBlock }
     let confirmed = false
@@ -292,15 +307,24 @@ export async function runAgent(input: RunAgentInput) {
       durationMs,
       errorCode: result.error?.code,
       errorDetail: (call.name === 'web.search' || Boolean(tool?.definition.computer)) ? result.error?.message.slice(0, 400) : undefined,
-      target: tool?.definition.computer?.targetArgument && call.arguments && typeof call.arguments === 'object' ? String((call.arguments as Record<string, unknown>)[tool.definition.computer.targetArgument] ?? '').slice(0, 260) : undefined,
+      target: !folderFlow && !localDelivery && tool?.definition.computer?.targetArgument && call.arguments && typeof call.arguments === 'object' ? String((call.arguments as Record<string, unknown>)[tool.definition.computer.targetArgument] ?? '').slice(0, 260) : undefined,
       confirmed,
       permissionReason: decision.reason,
     }
     audit.push(auditRecord)
     input.onAudit?.(auditRecord)
     session.events.push({ type: 'tool_result', callId: call.id, name: call.name, result, timestamp: new Date().toISOString() })
+    if (folderFlow) {
+      const step = folderFlow.advance(call, result)
+      if (step.reply) return finishLocal(step.reply, true)
+      directAction = step.nextCall
+      continue
+    }
     browserReads.accept(call, result)
     reply.accept({ call, result, definition: tool?.definition })
+    const attachmentNext=attachmentFlow?.advance(call,result)
+    if(attachmentNext?.reply)return finishLocal(attachmentNext.reply,true)
+    if(attachmentNext?.nextCall){directAction=attachmentNext.nextCall;continue}
     if(['browser.verify','browser.verify_collection'].includes(call.name)&&result.success){execution.transition('verified');return finishLocal('')}
     if (purposeBlock) return finishLocal(purposeBlock)
     const browserNext = browserFlow?.advance(call, result)
@@ -316,7 +340,7 @@ export async function runAgent(input: RunAgentInput) {
     if ((input.operation || experience) && !result.success && (writeKey || result.error?.code === 'PermissionDenied')) return finishLocal(`本次方法已停止：${result.error?.message ?? '操作结果无法确认'}。没有继续或自动重试；之前已发出的动作可能已生效，请核对现场。`)
     if (result.success && (call.name === 'operation.prepare' || call.name === 'operation.propose')) return finishLocal(call.name === 'operation.prepare' ? '方法执行面板已准备。请核对参数和范围并点击开始；现在还没有执行。' : '方法草稿已准备。请核对步骤、完成条件和隐私内容后保存；现在还没有写入记忆。')
     const liveRoomDecision = liveRoomFlow?.advance(call, result)
-    if (liveRoomDecision?.reply) return finishLocal(liveRoomDecision.reply)
+    if (liveRoomDecision?.reply) return finishLocal(liveRoomDecision.reply, Boolean(actionIntent.liveStatusName))
     if (liveRoomDecision?.nextCall) {
       directAction = liveRoomDecision.nextCall
       continue

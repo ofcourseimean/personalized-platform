@@ -9,13 +9,15 @@ export function describeElement(element) {
   const name=clean(element.getAttribute('aria-label') || labelled.trim() || element.labels?.[0]?.innerText || (tag==='input'?element.getAttribute('placeholder'):element.innerText) || element.getAttribute('title'))
   const hint=`${name} ${element.getAttribute('name')??''} ${element.getAttribute('autocomplete')??''}`
   if(/账号|账户|切换用户|选择用户|切换身份|account|username|credential|current-password|new-password|profile/i.test(hint))return null
-  if (/password|passwd|密码|验证码|otp|one-time|credit|银行卡|身份证|token|secret|登录|登入|sign.?in|log.?in|发送|提交|保存|删除|清空|购买|支付|转账|授权|同意|退出|注销|订阅|退订|修改|编辑|上传|下载|转发|回复|标为|标记|subscribe|send|submit|save|delete|remove|purchase|pay|logout|sign.?out|upload|download|reply|forward|mark.?as|edit/i.test(hint) || element.closest('[contenteditable="true"]')) return null
+  if (/password|passwd|密码|验证码|otp|one-time|credit|银行卡|身份证|token|secret|登录|登入|sign.?in|log.?in|发送|提交|保存|删除|清空|购买|支付|转账|授权|同意|退出|注销|订阅|退订|修改|编辑|上传|转发|回复|标为|标记|subscribe|send|submit|save|delete|remove|purchase|pay|logout|sign.?out|upload|reply|forward|mark.?as|edit/i.test(hint) || element.closest('[contenteditable="true"]')) return null
+  const download = /下载|download/i.test(hint)
   if (tag==='a') {
-    if (element.hasAttribute('download')) return null
     try {const url=new URL(element.href);if(url.origin!==location.origin || url.protocol!=='https:' || url.username || url.password || /logout|delete|remove|unsubscribe|purchase|payment|transfer|switch[_/-]?(?:account|user)|impersonat|reset[_/-]?password|支付|删除|转账/i.test(url.href))return null
+      if (download || element.hasAttribute('download') || /\.(?:pdf|docx|xlsx|pptx)$/i.test(url.pathname)) return {name:name||'下载附件',operation:'download',href:url.href}
       return {name:name||'查看链接',operation:'invoke',href:url.href,...(element.target==='_blank'?{opensTab:true}:{})}
     } catch {return null}
   }
+  if (download) return null
   const role=element.getAttribute('role')??'',options=role==='option'&&element.closest('[role="listbox"]')
   if(tag==='input'&&['checkbox','radio'].includes(type)||['checkbox','radio'].includes(role)){
     const form=element.closest('form')

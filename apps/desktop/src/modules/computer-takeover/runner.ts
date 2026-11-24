@@ -97,16 +97,16 @@ export class TakeoverRunner {
         if (Date.now() >= this.expires || this.actions >= 8) throw new Error('本次接管达到时间或步骤上限')
         const control = observation.controls.find(control => control.id === decision.action.elementId)
         this.executionState.transition('acting')
-        this.update('acting', decision.action.operation === 'fill' ? '正在填写普通输入框' : '正在调用按钮', control?.name)
+        this.update('acting', decision.action.operation === 'fill' ? '正在填写普通输入框' : '正在操作当前控件', control?.name)
         try {
           this.actions += 1
           const result = await this.options.native.act(this.session, observation.revision, decision.action, false)
-          this.lastResult = result.verified ? '填写值已由原生接口核对一致' : '按钮调用已发出，不代表目标完成；请检查当前观察'
+          this.lastResult = result.verified ? '当前控件的操作结果已由原生接口核对，请结合新观察判断任务目标' : '操作已发出，请检查当前观察是否符合用户目标'
           this.update('checking', '正在重新观察并核对结果')
         } catch (error) {
           const reason = String(error)
           if (reason.includes('TAKEOVER_ACTION_CONFIRMATION_REQUIRED')) {
-            this.actions -= 1; this.pending = { action: decision.action, revision: observation.revision }; this.update('waiting', decision.action.operation === 'fill' ? '普通输入框的用途需要你核对，确认本次填写后才执行。' : '这个按钮的作用不明确，请你确认后才执行。', control?.name)
+            this.actions -= 1; this.pending = { action: decision.action, revision: observation.revision }; this.update('waiting', decision.action.operation === 'fill' ? '请核对这个输入框并确认填写。' : '请核对当前控件并确认这次操作。', control?.name)
             return
           }
           // Do not retry a write: failure may occur after dispatch.

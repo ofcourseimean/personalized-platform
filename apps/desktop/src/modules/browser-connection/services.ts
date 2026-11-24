@@ -83,6 +83,7 @@ export function createBrowserServices(goal: string, signal?: AbortSignal): Brows
       // This flag is program-owned and independently opted into per website.
       // Neither model tool arguments nor untrusted page text can grant login.
       if(request.kind==='act'&&!initial.companion.browser?.interactionSites?.includes(origin))throw new Error('本网站尚未允许页面导航与检索，请在网站设置中单独勾选；未执行操作')
+      if(request.kind==='act'&&request.interaction?.operation==='download'&&!task?.downloadAllowed)throw new Error('本轮没有获准下载当前网站的附件。需要明确提出下载，并启用专用浏览器和网站页面操作。')
       let targetUrl:string|undefined
       if(request.kind==='ensure'){
         const profile=initial.companion.browser?.profiles?.find(item=>item.origin===origin)

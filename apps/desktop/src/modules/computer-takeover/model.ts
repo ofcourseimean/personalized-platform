@@ -1,9 +1,10 @@
 import type { AgentModelProvider, AgentModelRequest, AgentToolDefinition } from '../companion/agent/types'
 import type { TakeoverAction, TakeoverObservation } from './types'
+import { supportsTakeoverAction, takeoverOperations } from './types'
 
 const actionTool: AgentToolDefinition = {
-  name: 'takeover.act', description: '对本轮观察中已存在的控件执行一次操作。fill仅填写单行普通文字；invoke仅调用按钮，提交/发送/保存/删除等禁止。不能输入快捷键或Shell。', capability: 'system', scope: 'none', risk: 'medium',
-  inputSchema: { type: 'object', additionalProperties: false, required: ['elementId', 'operation'], properties: { elementId: { type: 'string' }, operation: { type: 'string', enum: ['fill', 'invoke'] }, text: { type: 'string' } } },
+  name: 'takeover.act', description: '操作当前控件。fill填写普通文字，invoke调用按钮，select选择项目，expand/collapse展开或收起，scroll_down/scroll_up移动滚动容器。只有fill可传text。用控件的能力与当前状态选择操作。', capability: 'system', scope: 'none', risk: 'medium',
+  inputSchema: { type: 'object', additionalProperties: false, required: ['elementId', 'operation'], properties: { elementId: { type: 'string' }, operation: { type: 'string', enum: [...takeoverOperations] }, text: { type: 'string' } } },
 }
 const resultTool: AgentToolDefinition = {
   name: 'takeover.result', description: '根据本次观察结束任务：observed表示只读观察结束，verified表示目标已经有现场证据证明达成，handoff表示需要人处理。不能仅因为动作发出就认定完成。', capability: 'read', scope: 'none', risk: 'read_only',
@@ -22,9 +23,11 @@ export async function decideTakeover(provider: AgentModelProvider, context: Agen
   if (!args || typeof args !== 'object' || Array.isArray(args)) throw new Error('接管模型参数无效')
   const data = args as Record<string, unknown>
   if (response.call.name === 'takeover.act') {
-    if (!control || !['fill', 'invoke'].includes(String(data.operation)) || typeof data.elementId !== 'string' || !observation.controls.some(element => element.id === data.elementId) || (data.text !== undefined && typeof data.text !== 'string') || Object.keys(data).some(key => !['elementId', 'operation', 'text'].includes(key))) throw new Error('模型操作超出了本次窗口范围')
-    if (data.operation === 'fill' && (typeof data.text !== 'string' || data.text.length > 2000 || [...data.text].some(char => char.charCodeAt(0) < 32 || (char.charCodeAt(0) >= 127 && char.charCodeAt(0) <= 159)))) throw new Error('只支持2000字以内的单行普通文字')
-    return { type: 'action', action: { elementId: data.elementId, operation: data.operation as 'fill' | 'invoke', text: data.text as string | undefined } }
+    const operation = takeoverOperations.find(value => value === data.operation)
+    const element = observation.controls.find(item => item.id === data.elementId)
+    if (!control || !operation || !element || !supportsTakeoverAction(element, operation) || (operation !== 'fill' && data.text !== undefined) || Object.keys(data).some(key => !['elementId', 'operation', 'text'].includes(key))) throw new Error('模型操作超出了本次窗口范围')
+    if (operation === 'fill' && (typeof data.text !== 'string' || data.text.length > 2000 || /\p{Cc}/u.test(data.text))) throw new Error('只支持2000字以内的单行普通文字')
+    return { type: 'action', action: { elementId: element.id, operation, text: typeof data.text === 'string' ? data.text : undefined } }
   }
   if (response.call.name !== 'takeover.result' || !['observed', 'verified', 'handoff'].includes(String(data.status)) || typeof data.evidence !== 'string' || !data.evidence.trim()) throw new Error('模型没有给出有效结果依据')
   if (data.status === 'verified') {

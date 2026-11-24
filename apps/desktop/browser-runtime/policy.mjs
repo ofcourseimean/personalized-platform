@@ -48,7 +48,7 @@ export function networkPolicy(sites, { manualLogin = false, resolve = lookup, dn
     } catch { await route.abort('blockedbyclient').catch(()=>{}) }
   }
 }
-export const operations = ['invoke','search','fill','select','scroll']
+export const operations = ['invoke','search','fill','select','scroll','download']
 export function interaction(value) {
   if (!value || !/^[a-f\d-]{36}$/i.test(value.observationId) || !/^[a-f\d-]{36}$/i.test(value.elementId) || !operations.includes(value.operation)) throw new Error('BROWSER_ARGUMENT')
   if (['search','fill','select'].includes(value.operation) && (typeof value.query !== 'string' || !value.query.trim() || value.query.length > 200 || /[\r\n\0]|(?:password|密码|验证码|Bearer\s|sk-)/i.test(value.query))) throw new Error('BROWSER_ARGUMENT')

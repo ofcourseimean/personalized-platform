@@ -3,6 +3,16 @@ import { createSeedLibrary } from '../../domain/seed'
 import { prepareBrowserTurn,rememberBrowserTurn,forgetBrowserTurn } from './taskSession'
 beforeEach(()=>{forgetBrowserTurn('main');forgetBrowserTurn('desktop');vi.useRealTimers()})
 describe('private task slots without private page history',()=>{
+  it('retains an unresolved attachment request when the user clarifies the course',()=>{
+    const companion=createSeedLibrary().companion,origin='https://school.example.com'
+    companion.browser={enabled:true,backend:'managed',sites:[origin],interactionSites:[origin],profiles:[{origin,label:'网络学堂',role:'portal'}]}
+    const first=prepareBrowserTurn('去网络学堂找最新讲义，下载后打开',companion)
+    rememberBrowserTurn(first.task,companion,'main',first.message)
+    const second=prepareBrowserTurn('课程是概率论',companion)
+    expect(second.task).toMatchObject({origins:[origin],downloadAllowed:true})
+    expect(second.message).toContain('课程是概率论')
+    expect(second.message).toContain('下载后打开')
+  })
   it('continues an ambiguous target clarification, preserving unread purpose but not other channels',()=>{
     const companion=createSeedLibrary().companion;companion.browser={enabled:true,sites:['https://portal.example.com']}
     const first=prepareBrowserTurn('查看我的邮箱有未读邮件吗',companion)

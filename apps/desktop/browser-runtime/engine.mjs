@@ -6,10 +6,13 @@ import { followed } from './followed.mjs'
 import { continueLogin } from './login.mjs'
 import { protectLoginRedirects } from './login-redirects.mjs'
 import { ManagedRecorder } from './recording.mjs'
+import { resolve } from 'node:path'
+import { saveDocument } from './download.mjs'
 
 export class BrowserEngine {
   constructor(profile, launcher=options=>chromium.launchPersistentContext(profile,options)) {
     this.launcher=launcher;this.context=null;this.mode='idle';this.sites=[];this.interactions=[]
+    this.downloadDirectory=resolve(profile,'..','attachments')
     this.pages=new Map();this.observations=new Map();this.sequence=0;this.taskSite=null;this.logins=[];this.loginAttempts=new Set()
   }
   async close() {
@@ -91,7 +94,7 @@ export class BrowserEngine {
     if(request.kind==='tabs')return Promise.all(matching().slice(0,20).map(tab))
     if(request.kind==='ensure') {
       const target=pageUrl(request.targetUrl??site,site)
-      const existing=matching().find(([,page])=>page.url()===target)??matching()[0]
+      const existing=matching().find(([,page])=>page.url()===target)??(target===`${site}/`?matching()[0]:undefined)
       if(existing){await protectLoginRedirects(existing[1],site);return [await tab(existing)]}
       const page=await this.context.newPage()
       try{await protectLoginRedirects(page,site);await page.goto(target,{waitUntil:'domcontentloaded',timeout:15000});await this.settle(page);return [await tab([...this.pages.entries()].find(([,value])=>value===page))]}
@@ -115,7 +118,8 @@ export class BrowserEngine {
       const observation=this.observations.get(request.tabId);this.observations.delete(request.tabId)
       let nextTabId
       try{
-        const popup=await act(page,observation,request.interaction)
+        const popup=await act(page,observation,request.interaction,ref=>saveDocument(ref,this.downloadDirectory))
+        if(popup?.attachment)return {tabId:request.tabId,origin:site,actionStatus:'downloaded',attachment:popup.attachment}
         if(popup){await popup.waitForLoadState('domcontentloaded',{timeout:8000}).catch(()=>{throw new Error('BROWSER_ACTION_UNKNOWN')});if(new URL(popup.url()).origin!==site)throw new Error('BROWSER_ACTION_UNKNOWN');this.register(popup);nextTabId=[...this.pages.entries()].find(([,value])=>value===popup)?.[0]}
         try{await this.settle(popup??page)}catch{throw new Error('BROWSER_ACTION_UNKNOWN')}
       }finally{await release(observation)}

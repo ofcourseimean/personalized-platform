@@ -37,7 +37,8 @@ pub fn grant_matches(grant: &ComputerGrant, required: &str, actual: &str) -> boo
     if grant.capability != required {
         return false;
     }
-    let expected = grant.target.trim().replace('/', "\\").to_lowercase();
+    let expected = normalize_target(&grant.target);
+    let actual = normalize_target(actual);
     if grant.target_kind == "global" || expected == "*" {
         return true;
     }
@@ -48,6 +49,14 @@ pub fn grant_matches(grant: &ComputerGrant, required: &str, actual: &str) -> boo
         return actual == expected || actual.starts_with(&format!("{}\\", expected.trim_end_matches('\\')));
     }
     actual == expected || actual.ends_with(&format!("\\{expected}"))
+}
+
+fn normalize_target(value: &str) -> String {
+    let value = value.trim().replace('/', "\\").to_lowercase();
+    if let Some(unc) = value.strip_prefix(r"\\?\unc\") {
+        return format!(r"\\{unc}");
+    }
+    value.strip_prefix(r"\\?\").unwrap_or(&value).to_owned()
 }
 
 pub fn target_allowed(policy: &ComputerPolicy, capability: &str, target: &str) -> bool {

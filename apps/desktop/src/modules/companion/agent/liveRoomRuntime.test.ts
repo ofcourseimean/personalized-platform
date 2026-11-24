@@ -33,6 +33,20 @@ function fixture() {
 }
 
 describe('natural live room request through the real runtime and permission engine', () => {
+  it('answers the named live-status question directly without exposing discovery search results', async () => {
+    const f = fixture()
+    const anchorName = '天才美少女卡莎'
+    const queryLiveStatus = vi.fn(async () => ({
+      roomUrl: target, status: 'live' as const, reason: '', anchorName,
+      fetchedAtEpochMs: Date.now(), sourceUrls: [target], untrusted: true as const,
+    }))
+    f.input.services.queryLiveStatus = queryLiveStatus
+    const result = await runAgent({ ...f.input, message: `${anchorName}开播了吗` })
+    expect(queryLiveStatus).toHaveBeenCalledExactlyOnceWith(target, anchorName, true)
+    expect(result.text).toMatch(/^「天才美少女卡莎」正在直播。/u)
+    expect(result.text).not.toMatch(/https:|公开搜索|顶级瞄准|本次执行结果/u)
+    expect(f.provider.generate).not.toHaveBeenCalled()
+  })
   it('runs search → verified target → open without model or persistent tasks', async () => {
     const f = fixture()
     const result = await runAgent(f.input)

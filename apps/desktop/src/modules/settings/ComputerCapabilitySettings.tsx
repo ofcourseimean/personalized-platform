@@ -30,6 +30,7 @@ export function ComputerCapabilitySettings() {
   const settings = data.companion.computer
   const [capability, setCapability] = useState<ComputerCapability>('file_read')
   const [target, setTarget] = useState('D:\\coding')
+  const [alias, setAlias] = useState('')
   const [mode, setMode] = useState<ComputerGrant['mode']>('allow')
   const [message, setMessage] = useState('电脑能力默认关闭；开启后仍由权限层逐项检查。')
   const targetKind = useMemo<ComputerGrant['targetKind']>(() => {
@@ -53,10 +54,12 @@ export function ComputerCapabilitySettings() {
         capability,
         targetKind,
         target: normalized,
+        ...(capability === 'file_read' && mode === 'allow' && alias.trim() ? { alias: alias.trim() } : {}),
         mode,
         createdAt: new Date().toISOString(),
       }],
     })
+    setAlias('')
     setMessage('已添加：' + capabilityName(capability) + ' · ' + normalized)
   }
   const detectFfmpeg = async () => {
@@ -121,6 +124,7 @@ export function ComputerCapabilitySettings() {
               <label><span>能力</span><select value={capability} onChange={(event) => updateCapability(event.target.value as ComputerCapability)}>{capabilityOptions.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
               <label><span>规则</span><select value={mode} onChange={(event) => setMode(event.target.value as ComputerGrant['mode'])}><option value="allow">允许</option><option value="ask">每次询问</option><option value="deny">禁止</option></select></label>
               <label className="computer-grant-target"><span>{targetKind === 'directory' ? '目录' : targetKind === 'program' ? '程序' : '范围'}</span><input disabled={targetKind === 'global'} value={targetKind === 'global' ? '*' : target} onChange={(event) => setTarget(event.target.value)} placeholder={targetKind === 'directory' ? 'D:\\coding' : '程序完整路径或名称'} /></label>
+              {capability === 'file_read' && mode === 'allow' && <label className="computer-grant-target"><span>目录称呼（可选）</span><input value={alias} maxLength={40} onChange={event => setAlias(event.target.value)} placeholder="例如：家教资料" /></label>}
               <button className="ghost-button" onClick={addGrant}>添加规则</button>
             </div>
             <div className="computer-grant-list">{settings.grants.map((grant) => <div key={grant.id}><span><strong>{capabilityName(grant.capability)}</strong><small>{grant.mode === 'allow' ? '允许' : grant.mode === 'deny' ? '禁止' : '询问'} · {grant.target}</small></span><button title="移除规则" onClick={() => setCompanionComputer({ grants: settings.grants.filter((item) => item.id !== grant.id) })}>移除</button></div>)}{!settings.grants.length && <p>还没有长期规则。文件、程序与 PowerShell 会在需要时逐次询问。</p>}</div>

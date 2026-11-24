@@ -1,5 +1,5 @@
 import type { CompanionData } from '../../domain/models'
-import { browserObjective,resolveBrowserTask,type BrowserTaskGoal } from './taskGoal'
+import { browserObjective,requestsAttachment,resolveBrowserTask,type BrowserTaskGoal } from './taskGoal'
 
 type Pending={objective:BrowserTaskGoal['objective'];goal:string;origin?:string;signature:string;expires:number}
 const pending=new Map<string,Pending>()
@@ -10,9 +10,10 @@ export function prepareBrowserTurn(message:string,companion:CompanionData,channe
   const previous=pending.get(channel),current=signature(companion)
   const currentObjective=browserObjective(message)
   forgetBrowserTurn(channel)
-  const followup=/^(?:继续|再查(?:一下)?|重试|就是|也就是|这个|那个|用这个|查这个|https?:\/\/)/u.test(message.trim())
-  if(!previous||previous.expires<=Date.now()||previous.signature!==current||!followup||browserObjective(message)&&!/^(?:就是|也就是|这个|那个|用这个|查这个|继续|重试)/u.test(message.trim()))return {message,task:resolveBrowserTask(message,companion),resolvedFromClarification:false}
-  const cue=currentObjective&&!/^(?:就是|也就是|用这个|查这个|https?:\/\/)/u.test(message.trim())?message:previous.goal
+  const attachmentDetail=previous&&requestsAttachment(previous.goal)&&/^(?:课程(?:是|叫|[:：])|资料(?:是|叫|[:：])|就选|我说的是|去找的是)/u.test(message.trim())
+  const followup=attachmentDetail||/^(?:继续|再查(?:一下)?|重试|就是|也就是|这个|那个|用这个|查这个|https?:\/\/)/u.test(message.trim())
+  if(!previous||previous.expires<=Date.now()||previous.signature!==current||!followup||currentObjective&&!attachmentDetail&&!/^(?:就是|也就是|这个|那个|用这个|查这个|继续|重试)/u.test(message.trim()))return {message,task:resolveBrowserTask(message,companion),resolvedFromClarification:false}
+  const cue=currentObjective&&!attachmentDetail&&!requestsAttachment(previous.goal)&&!/^(?:就是|也就是|用这个|查这个|https?:\/\/)/u.test(message.trim())?message:previous.goal
   const explicit=/https?:\/\//u.test(message)
   const effective=`${cue}，${message}${!explicit&&previous.origin?` ${previous.origin}`:''}`
   return {message:effective,task:resolveBrowserTask(effective,companion),resolvedFromClarification:explicit}

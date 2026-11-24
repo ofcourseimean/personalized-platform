@@ -1,6 +1,6 @@
 use serde::Serialize;
 use std::time::{Duration, Instant};
-use windows::{core::Interface, Win32::{Foundation::HWND, System::{Com::{CoCreateInstance, CoInitializeEx, CoUninitialize, CLSCTX_INPROC_SERVER, COINIT_MULTITHREADED}, Ole::{SafeArrayDestroy, SafeArrayGetElement, SafeArrayGetLBound, SafeArrayGetUBound}}, UI::Accessibility::{CUIAutomation8, IUIAutomation, IUIAutomation2, IUIAutomationElement, IUIAutomationInvokePattern, IUIAutomationValuePattern, UIA_InvokePatternId, UIA_ValuePatternId}}};
+use windows::{core::Interface, Win32::{Foundation::HWND, System::{Com::{CoCreateInstance, CoInitializeEx, CoUninitialize, CLSCTX_INPROC_SERVER, COINIT_MULTITHREADED}, Ole::{SafeArrayDestroy, SafeArrayGetElement, SafeArrayGetLBound, SafeArrayGetUBound}}, UI::Accessibility::{CUIAutomation8, IUIAutomation, IUIAutomation2, IUIAutomationElement, IUIAutomationInvokePattern, IUIAutomationValuePattern, UIA_InvokePatternId, UIA_ValuePatternId, IUIAutomationSelectionItemPattern, IUIAutomationExpandCollapsePattern, IUIAutomationScrollPattern, UIA_SelectionItemPatternId, UIA_ExpandCollapsePatternId, UIA_ScrollPatternId, ExpandCollapseState_Collapsed, ExpandCollapseState_Expanded, ExpandCollapseState_PartiallyExpanded, ScrollAmount_NoAmount, ScrollAmount_LargeIncrement, ScrollAmount_LargeDecrement}}};
 
 #[derive(Clone, Debug, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -11,6 +11,11 @@ pub struct Control {
     pub control_type: i32,
     pub can_fill: bool,
     pub can_invoke: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub selected: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expanded: Option<bool>,
+    pub can_scroll: bool,
     #[serde(skip)] pub runtime_id: Vec<i32>,
 }
 
@@ -66,7 +71,24 @@ pub fn walk(automation: &Automation, hwnd: HWND) -> Result<Snapshot, String> {
             if visible && element.CurrentIsEnabled().map(|value| value.as_bool()).unwrap_or(false) {
                 if let Some(identity) = runtime_id(&element) {
                     let name = element.CurrentName().map(|value| value.to_string()).unwrap_or_default().chars().take(160).collect();
-                    let control = Control { id: format!("e{}", result.len()), name, automation_id: element.CurrentAutomationId().map(|value| value.to_string()).unwrap_or_default().chars().take(100).collect(), control_type: element.CurrentControlType().map(|value| value.0).unwrap_or(0), can_fill: element.GetCurrentPatternAs::<IUIAutomationValuePattern>(UIA_ValuePatternId).is_ok(), can_invoke: element.GetCurrentPatternAs::<IUIAutomationInvokePattern>(UIA_InvokePatternId).is_ok(), runtime_id: identity };
+                    let selected = element.GetCurrentPatternAs::<IUIAutomationSelectionItemPattern>(UIA_SelectionItemPatternId)
+                        .and_then(|pattern| pattern.CurrentIsSelected()).ok().map(|value| value.as_bool());
+                    let expanded = element.GetCurrentPatternAs::<IUIAutomationExpandCollapsePattern>(UIA_ExpandCollapsePatternId)
+                        .and_then(|pattern| pattern.CurrentExpandCollapseState()).ok().and_then(|state| {
+                            if state == ExpandCollapseState_Collapsed { Some(false) }
+                            else if state == ExpandCollapseState_Expanded || state == ExpandCollapseState_PartiallyExpanded { Some(true) }
+                            else { None }
+                        });
+                    let can_scroll = element.GetCurrentPatternAs::<IUIAutomationScrollPattern>(UIA_ScrollPatternId)
+                        .and_then(|pattern| pattern.CurrentVerticallyScrollable()).is_ok_and(|value| value.as_bool());
+                    let control = Control {
+                        id: format!("e{}", result.len()), name,
+                        automation_id: element.CurrentAutomationId().map(|value| value.to_string()).unwrap_or_default().chars().take(100).collect(),
+                        control_type: element.CurrentControlType().map(|value| value.0).unwrap_or(0),
+                        can_fill: element.GetCurrentPatternAs::<IUIAutomationValuePattern>(UIA_ValuePatternId).is_ok(),
+                        can_invoke: element.GetCurrentPatternAs::<IUIAutomationInvokePattern>(UIA_InvokePatternId).is_ok(),
+                        selected, expanded, can_scroll, runtime_id: identity,
+                    };
                     result.push((control, element.clone()));
                 }
             }
@@ -102,6 +124,26 @@ pub fn act(element: &IUIAutomationElement, operation: &str, text: &str) -> Resul
                 invoke.Invoke().map_err(|_| "TAKEOVER_INVOKE_FAILED")?;
                 // Invocation is only dispatch evidence; the next observation must check its result.
                 Ok(false)
+            }
+            "select" => {
+                let item: IUIAutomationSelectionItemPattern = element.GetCurrentPatternAs(UIA_SelectionItemPatternId).map_err(|_| "TAKEOVER_OPERATION_UNSUPPORTED")?;
+                if item.CurrentIsSelected().is_ok_and(|value| value.as_bool()) { return Ok(true) }
+                item.Select().map_err(|_| "TAKEOVER_CONTROL_FAILED")?;
+                Ok(item.CurrentIsSelected().is_ok_and(|value| value.as_bool()))
+            }
+            "expand" | "collapse" => {
+                let item: IUIAutomationExpandCollapsePattern = element.GetCurrentPatternAs(UIA_ExpandCollapsePatternId).map_err(|_| "TAKEOVER_OPERATION_UNSUPPORTED")?;
+                let target = if operation == "expand" { ExpandCollapseState_Expanded } else { ExpandCollapseState_Collapsed };
+                if item.CurrentExpandCollapseState().is_ok_and(|value| value == target) { return Ok(true) }
+                if operation == "expand" { item.Expand() } else { item.Collapse() }.map_err(|_| "TAKEOVER_CONTROL_FAILED")?;
+                Ok(item.CurrentExpandCollapseState().is_ok_and(|value| value == target))
+            }
+            "scroll_down" | "scroll_up" => {
+                let item: IUIAutomationScrollPattern = element.GetCurrentPatternAs(UIA_ScrollPatternId).map_err(|_| "TAKEOVER_OPERATION_UNSUPPORTED")?;
+                let before = item.CurrentVerticalScrollPercent().map_err(|_| "TAKEOVER_OPERATION_UNSUPPORTED")?;
+                let direction = if operation == "scroll_down" { ScrollAmount_LargeIncrement } else { ScrollAmount_LargeDecrement };
+                item.Scroll(ScrollAmount_NoAmount, direction).map_err(|_| "TAKEOVER_CONTROL_FAILED")?;
+                Ok(item.CurrentVerticalScrollPercent().is_ok_and(|after| (after - before).abs() > 0.01))
             }
             _ => Err("TAKEOVER_OPERATION_INVALID".into()),
         }

@@ -42,3 +42,65 @@ it('plans model-interpreted dates and sorting through normal tools without sendi
   expect(reply).toContain('2条通知');expect(phase).toBe(3);expect(mock.generate).toHaveBeenCalledTimes(4)
   expect(JSON.stringify([useLibraryStore.getState().data.companion.messages,useLibraryStore.getState().data.companion.agentAudit])).not.toMatch(/PRIVATE-|observationId|first@example.com/)
 })
+
+it('downloads a current attachment and delivers both open actions locally through the normal chat entry point',async()=>{
+  const data=useLibraryStore.getState().data
+  data.companion.browser!.profiles=[{origin,role:'portal',label:'网络学堂'}]
+  data.companion.computer.enabled=true
+  data.companion.computer.profile='trusted_workstation'
+  const directory='C:\\PRIVATE-DIRECTORY'
+  const path=`${directory}\\网页-课程.pdf`
+  const opened:string[]=[]
+  const observationId=crypto.randomUUID(),elementId=crypto.randomUUID()
+  mock.native.mockImplementation(async(name,args)=>{
+    if(name==='computer_execute'){
+      expect(args.request.action).toBe('app_open')
+      const target=args.request.params.target
+      opened.push(target)
+      return {opened:true,target,status:'submitted_to_default_handler'}
+    }
+    if(name==='managed_browser_configure')return {epoch:3}
+    const request=args.request
+    const value=request.kind==='tabs'?[{tabId:7,origin}]:request.kind==='act'?
+      {tabId:7,origin,actionStatus:'downloaded',attachment:{name:'网页-课程.pdf',path,directory,bytes:123}}:
+      {tabId:7,origin,observationId,text:'PRIVATE-BODY',controls:[{id:elementId,operation:'download',name:'PRIVATE-TITLE 2026-11-24'}]}
+    return {verified:true,privateBrowser:true,untrusted:true,origin,data:value}
+  })
+  mock.generate.mockImplementation(async(request:AgentModelRequest)=>{
+    expect(JSON.stringify(request)).not.toMatch(/PRIVATE-|computer_execute/)
+    expect(request.tools.some(tool=>tool.name==='system.open')).toBe(false)
+    return {type:'tool_call',call:{id:crypto.randomUUID(),name:'browser.act',arguments:{origin,tabId:7,observationId,elementId,operation:'download'}}}
+  })
+  const reply=await sendCompanionTurn('去网络学堂找这门课最新的讲义，下载后打开，再打开它所在的文件夹')
+  expect(mock.generate).toHaveBeenCalledOnce()
+  expect(opened,reply).toEqual([path,directory])
+  expect(reply).toContain('已下载')
+  expect(reply).toContain('已把所在文件夹交给 Windows 打开')
+  expect(reply).not.toContain('本次执行结果')
+  expect(JSON.stringify([useLibraryStore.getState().data.companion.messages,useLibraryStore.getState().data.companion.agentAudit])).not.toContain('PRIVATE-')
+})
+
+it('resolves a folder locally, asks about duplicates, and carries a selection in the same chat',async()=>{
+  const data=useLibraryStore.getState().data
+  const computer=data.companion.computer
+  computer.enabled=true
+  computer.profile='trusted_workstation'
+  computer.grants=[{id:'fixture-root',targetKind:'directory',capability:'file_read',mode:'allow',target:'D:\\workspace',createdAt:''}]
+  const paths=['D:\\workspace\\a\\家教','D:\\workspace\\b\\家教']
+  mock.native.mockImplementation(async(name,args)=>{
+    expect(name).toBe('computer_execute')
+    if(args.request.action==='file_search'){
+      expect(args.request.params).toMatchObject({path:'D:\\workspace',query:'家教',directoriesOnly:true})
+      return {entries:paths.map(path=>({name:'家教',path,isDirectory:true})),complete:true}
+    }
+    expect(args.request.params).toEqual({target:paths[1],directory:true})
+    return {target:paths[1],opened:true,status:'submitted_to_default_handler'}
+  })
+  const reply=await sendCompanionTurn('本地家教文件夹打开一下')
+  expect(reply).toContain('候选文件夹')
+  expect(mock.native).toHaveBeenCalledOnce()
+  expect(await sendCompanionTurn('打开第二个')).toContain('交给 Windows 资源管理器')
+  expect(mock.native).toHaveBeenCalledTimes(2)
+  expect(mock.generate).not.toHaveBeenCalled()
+  expect(useLibraryStore.getState().data.companion.messages).toEqual([])
+})

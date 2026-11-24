@@ -36,6 +36,7 @@ const messages: Record<string, string> = {
 }
 
 const managedMessages:Record<string,string>={
+  BROWSER_DOWNLOAD_FAILED:'附件没有通过下载验证。请核对它是否为本站 PDF 或 Office 文档，且大小不超过 16 MiB。可以在网站上手动下载。',
   BROWSER_LOGIN_ACTIVE:'专用浏览器正在登录或示范，查询不会打断它。请先结束登录，或保存/丢弃示范；当前未取得查询结果。',
   BROWSER_BUSY:'专用浏览器正被另一项操作使用。请先结束当前登录、示范或查询；没有关闭或替换当前窗口。',
   BROWSER_SITE_PERMISSION:'本次网站尚未在专用浏览器授权，或页面操作未开启。请在浏览器连接设置核对精确网站与操作范围；不会改查其他账号或Edge扩展。',

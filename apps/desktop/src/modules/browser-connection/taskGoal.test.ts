@@ -87,6 +87,17 @@ describe('current task objective and target matrix',()=>{
     expect(resolveBrowserTask('查看邮箱 https://mail.qq.com/',data)?.origins).toEqual(['https://mail.qq.com'])
     data.browser!.sites=['https://mail.qq.com'];expect(resolveBrowserTask('查看我的邮箱',data)?.origins).toEqual(['https://mail.qq.com'])
   })
+  it('resolves arbitrary teaching portals by alias and restricts attachment actions to the managed backend',()=>{
+    const site='https://classes.example.com'
+    const data=companion([site,'https://portal.example.com'])
+    Object.assign(data.browser!,{backend:'managed',interactionSites:[site],profiles:[{origin:site,role:'portal',label:'网络学堂'}]})
+    const goal='去网络学堂找最新的讲义 notes.pdf，下载后打开，再打开它所在的文件夹'
+    expect(resolveBrowserTask(goal,data)).toMatchObject({origins:[site],downloadAllowed:true})
+    expect(resolveBrowserTask('查看网络学堂 https://classes.example.com/courses/42', data)).toMatchObject({origins:[site],explicitPage:true})
+    expect(resolveBrowserTask('查看网络学堂课程，不要下载讲义',data)?.downloadAllowed).toBeUndefined()
+    data.browser!.interactionSites=[]
+    expect(resolveBrowserTask(goal,data)?.downloadAllowed).toBeUndefined()
+  })
 })
 describe('generic read-only current-page flow',()=>{
   const task={objective:'mail' as const,origins:['https://mail.qq.com'],candidates:['https://mail.qq.com']}

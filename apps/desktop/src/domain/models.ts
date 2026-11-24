@@ -159,6 +159,7 @@ export interface ComputerGrant {
   capability: ComputerCapability
   targetKind: 'global' | 'application' | 'directory' | 'program' | 'display'
   target: string
+  alias?: string
   mode: ComputerPermissionMode
   createdAt: string
 }

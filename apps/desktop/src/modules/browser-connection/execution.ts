@@ -5,6 +5,7 @@ import { checkBrowserEvidence } from './evidence'
 import { checkBrowserParameter } from './parameters'
 import { browserNativeError } from './nativeError'
 import { BROWSER_AGENT_LIMITS } from './agentPolicy'
+import { assertAttachmentChoice } from './attachmentSelection'
 
 interface Observation {observationId:string;text:string;url:string;title:string;loading:boolean;truncated:boolean;loginState?:string;controls:Array<{id:string;operation:string;name?:string}>}
 export interface BrowserEvidenceRequest {origin:string;tabId:number;observationId:string;quotes:string[];answer:string}
@@ -20,6 +21,7 @@ export class BrowserExecution {
     const key=`${request.origin}:${request.tabId}`,page=this.observations.get(key),action=request.interaction
     if(!page||!action||action.observationId!==page.observationId||page.loading||page.loginState&&page.loginState!=='continued'||!page.controls.some(control=>control.id===action.elementId&&control.operation===action.operation))throw browserNativeError('BROWSER_STALE:')
     checkBrowserParameter(this.goal,action,page.controls.find(control=>control.id===action.elementId)!)
+    if(action.operation==='download')assertAttachmentChoice(this.goal,action.elementId,page.controls)
     this.observations.delete(key)
   }
   accept(request:BrowserReadRequest,result:BrowserSnapshot){

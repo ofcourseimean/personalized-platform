@@ -1,6 +1,6 @@
 import { describeElement } from './dom.mjs'
 import { interaction } from './policy.mjs'
-export async function act(page, observation, raw) {
+export async function act(page, observation, raw, download) {
   const action=interaction(raw)
   if(!observation || observation.value?.loading || observation.value?.loginState&&observation.value.loginState!=='continued' || observation.observationId!==action.observationId || observation.url!==page.url() || Date.now()-observation.created>60000)throw new Error('BROWSER_STALE')
   const ref=observation.refs.get(action.elementId)
@@ -9,6 +9,10 @@ export async function act(page, observation, raw) {
   if(ref.frame.url()!==ref.url || !await ref.document.evaluate(node=>node===document.documentElement).catch(()=>false))throw new Error('BROWSER_STALE')
   const live=await ref.handle.evaluate(describeElement).catch(()=>null)
   if(!live || JSON.stringify(live)!==JSON.stringify(ref.info) || live.operation!==action.operation)throw new Error('BROWSER_STALE')
+  if(action.operation==='download'){
+    if(!download)throw new Error('BROWSER_ARGUMENT')
+    return { attachment:await download(ref) }
+  }
   if(action.operation==='invoke') {
     // Trial dispatch cannot submit. Once real dispatch starts a timeout may
     // still mean the page received the action: never classify that as stale.
