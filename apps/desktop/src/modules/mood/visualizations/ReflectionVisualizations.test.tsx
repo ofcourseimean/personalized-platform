@@ -22,7 +22,7 @@ function chooseDetails(date: string) {
   fireEvent.click(screen.getByRole('button', { name: `选择详情 ${date}` }))
 }
 
-describe('bubble matrix and ribbon reflection views', () => {
+describe('mood reflection views', () => {
   beforeEach(() => {
     localStorage.removeItem(reflectionViewKey)
     vi.useFakeTimers()
@@ -38,7 +38,8 @@ describe('bubble matrix and ribbon reflection views', () => {
     fireEvent.click(screen.getByRole('button', { name: view.label }))
     expect(screen.getByRole('button', { name: view.label })).toHaveAttribute('aria-pressed', 'true')
     if (view.id === 'bubbles') chooseDetails('2026-10-01')
-    else fireEvent.click(screen.getByRole('button', { name: '查看 2026-10-01 的心情' }))
+    else if (view.id === 'original') fireEvent.click(screen.getByRole('button', { name: '查看 2026-10-01 的心情' }))
+    else fireEvent.click(screen.getByRole('button', { name: /^2026-10-01 心情走向/ }))
     expect(screen.getByText('真实备注')).toBeVisible()
     expect(localStorage.getItem(reflectionViewKey)).toBe(view.id)
     expect(JSON.stringify(useLibraryStore.getState().data)).toBe(before)
@@ -54,7 +55,7 @@ describe('bubble matrix and ribbon reflection views', () => {
     chooseDetails('2026-10-01')
     expect(screen.getByText('真实备注')).toBeVisible()
   })
-  it('keeps month, historical date and notes shared across both views', () => {
+  it('keeps month, historical date and notes shared across views', () => {
     open()
     fireEvent.click(screen.getByRole('button', { name: '按月' }))
     fireEvent.click(screen.getByRole('button', { name: '上个月' }))
@@ -63,6 +64,9 @@ describe('bubble matrix and ribbon reflection views', () => {
     expect(screen.getByRole('button', { name: '2026-09-15 难过：5 点；1/3 个时段' })).toHaveAttribute('aria-pressed', 'true')
     fireEvent.click(screen.getByRole('button', { name: '色带' }))
     expect(screen.getByRole('button', { name: '查看 2026-09-15 的心情' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByText('九月备注')).toBeVisible()
+    fireEvent.click(screen.getByRole('button', { name: '心情走向' }))
+    expect(screen.getByRole('button', { name: /^2026-09-15 心情走向/ })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByText('九月备注')).toBeVisible()
     fireEvent.click(screen.getByRole('button', { name: '气泡矩阵' }))
     expect(screen.getByRole('button', { name: '2026-09-15 难过：5 点；1/3 个时段' })).toHaveAttribute('aria-pressed', 'true')
@@ -80,13 +84,13 @@ describe('bubble matrix and ribbon reflection views', () => {
   })
   it('remembers only the view and always displays real records', () => {
     const first = open()
-    fireEvent.click(screen.getByRole('button', { name: '气泡矩阵' }))
+    fireEvent.click(screen.getByRole('button', { name: '心情走向' }))
     first.unmount()
     open()
-    expect(screen.getByRole('button', { name: '气泡矩阵' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: '心情走向' })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
-    expect(localStorage.getItem(reflectionViewKey)).toBe('bubbles')
-    chooseDetails('2026-10-01')
+    expect(localStorage.getItem(reflectionViewKey)).toBe('trend')
+    fireEvent.click(screen.getByRole('button', { name: /^2026-10-01 心情走向/ }))
     expect(screen.getByText('真实备注')).toBeVisible()
   })
   it('still switches views when preference storage is blocked', () => {
@@ -97,12 +101,13 @@ describe('bubble matrix and ribbon reflection views', () => {
     fireEvent.click(screen.getByRole('button', { name: '色带' }))
     expect(screen.getByRole('button', { name: '色带' })).toHaveAttribute('aria-pressed', 'true')
   })
-  it('defaults to monthly bubbles with only two views and secondary daily details', () => {
+  it('defaults to monthly bubbles with three peer views and secondary daily details', () => {
     const { container } = render(<MoodStats entries={entries} referenceDate="2026-10-01" />)
     container.querySelector('details')!.open = true
     expect(screen.getByRole('button', { name: '按月' })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByRole('button', { name: '气泡矩阵' })).toHaveAttribute('aria-pressed', 'true')
-    expect(within(screen.getByLabelText('选择情绪可视化')).getAllByRole('button').map((button) => button.textContent)).toEqual(['气泡矩阵', '色带'])
+    expect(within(screen.getByLabelText('选择情绪可视化')).getAllByRole('button').map((button) => button.textContent)).toEqual(['气泡矩阵', '色带', '心情走向'])
+    expect(screen.queryByRole('region', { name: '心情走向' })).not.toBeInTheDocument()
     expect(container.querySelector('.mood-day-detail')).not.toHaveAttribute('open')
     expect(container.querySelector('.mood-viz-record-picker')).not.toHaveAttribute('open')
     fireEvent.click(screen.getByRole('button', { name: '2026-10-01 开心：3 点；1/3 个时段' }))

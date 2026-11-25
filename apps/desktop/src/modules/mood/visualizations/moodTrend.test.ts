@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { MoodEntry, MoodPeriod, MoodPoints } from '../../../domain/models'
 import { moodTrend } from './moodTrend'
+import { moodTrendScale } from './moodTrendScale'
 
 function entry(date: string, period: MoodPeriod, points: MoodPoints, updatedAt = `${date}T12:00:00Z`): MoodEntry {
   return { id: `${date}-${period}`, date, period, points, createdAt: updatedAt, updatedAt }
@@ -54,5 +55,16 @@ describe('mood trend', () => {
     expect(day.periods).toBe(3)
     expect(day.score).toBeCloseTo(58.8333)
     expect(input).toEqual(before)
+  })
+})
+
+describe('mood trend scale', () => {
+  it('makes variation around 40–50 legible with padded, evenly spaced ticks', () => {
+    expect(moodTrendScale([40, 44.1, 46.9, 50])).toEqual({ min: 35, max: 55, ticks: [55, 50, 45, 40, 35] })
+  })
+
+  it('keeps a readable scale for a flat series and bounds the full score range', () => {
+    expect(moodTrendScale([46, 46])).toEqual({ min: 35, max: 55, ticks: [55, 50, 45, 40, 35] })
+    expect(moodTrendScale([0, 100])).toEqual({ min: 0, max: 100, ticks: [100, 80, 60, 40, 20, 0] })
   })
 })
