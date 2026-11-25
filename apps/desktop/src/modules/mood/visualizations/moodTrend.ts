@@ -32,6 +32,7 @@ export interface MoodTrendDay {
   date: string
   score: number | null
   periods: number
+  entries: MoodEntry[]
   average: number | null
   averageDays: number
 }
@@ -64,17 +65,23 @@ export function moodTrend(dates: string[], entries: MoodEntry[]): MoodTrendDay[]
     entriesByDay.set(entry.date, day)
   }
 
-  const scores = new Map<string, { score: number; periods: number }>()
+  const scores = new Map<string, { score: number; entries: MoodEntry[] }>()
   for (const [date, day] of entriesByDay) {
-    const periods = [...day.values()].map((entry) => periodScore(entry.points)).filter((score) => score !== null)
+    const periods = [...day.values()].flatMap((entry) => {
+      const score = periodScore(entry.points)
+      return score === null ? [] : [{ entry, score }]
+    })
     if (periods.length) {
-      scores.set(date, { score: periods.reduce((total, score) => total + score, 0) / periods.length, periods: periods.length })
+      scores.set(date, {
+        score: periods.reduce((total, period) => total + period.score, 0) / periods.length,
+        entries: periods.map((period) => period.entry),
+      })
     }
   }
 
   return dates.map((date) => {
     const day = scores.get(date)
-    if (!day) return { date, score: null, periods: 0, average: null, averageDays: 0 }
+    if (!day) return { date, score: null, periods: 0, entries: [], average: null, averageDays: 0 }
 
     const cursor = new Date(`${date}T12:00:00`)
     const recent: number[] = []
@@ -86,6 +93,7 @@ export function moodTrend(dates: string[], entries: MoodEntry[]): MoodTrendDay[]
     return {
       date,
       ...day,
+      periods: day.entries.length,
       average: recent.reduce((total, score) => total + score, 0) / recent.length,
       averageDays: recent.length,
     }

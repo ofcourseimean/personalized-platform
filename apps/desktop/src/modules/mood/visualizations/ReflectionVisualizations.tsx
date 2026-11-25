@@ -26,9 +26,10 @@ interface Props {
   activeDate: string
   onChooseDate: (date: string) => void
   children: ReactNode
+  renderDetails: (trend: boolean) => ReactNode
 }
 
-export function ReflectionVisualizations({ dates, entries, activeDate, onChooseDate, children }: Props) {
+export function ReflectionVisualizations({ dates, entries, activeDate, onChooseDate, children, renderDetails }: Props) {
   const [view, setView] = useState<ReflectionView>(initialView)
   const days = useMemo(() => reflectionDays(dates, entries), [dates, entries])
   const chooseView = (next: ReflectionView) => {
@@ -36,13 +37,16 @@ export function ReflectionVisualizations({ dates, entries, activeDate, onChooseD
     try { localStorage.setItem(reflectionViewKey, next) } catch { /* A view preference is optional. */ }
   }
   const selectedView = reflectionViews.find((option) => option.id === view)!
-  return <section className="mood-visualization-lab" aria-label="情绪回望可视化">
-    <div className="mood-viz-switch" role="group" aria-label="选择情绪可视化">{reflectionViews.map((option) => <button type="button" key={option.id} aria-pressed={view === option.id} onClick={() => chooseView(option.id)}>{option.label}</button>)}</div>
-    {selectedView.hint && <div className="mood-viz-introduction"><p>{selectedView.hint}</p></div>}
-    {view === 'trend' && <MoodTrendChart dates={dates} entries={entries} days={days} activeDate={activeDate} onChooseDate={onChooseDate} />}
-    {view === 'original' && <div className="mood-viz-original">{children}</div>}
-    {view === 'bubbles' && <BubbleReflection days={days} activeDate={activeDate} onChooseDate={onChooseDate} />}
-  </section>
+  return <>
+    <section className="mood-visualization-lab" aria-label="情绪回望可视化">
+      <div className="mood-viz-switch" role="group" aria-label="选择情绪可视化">{reflectionViews.map((option) => <button type="button" key={option.id} aria-pressed={view === option.id} onClick={() => chooseView(option.id)}>{option.label}</button>)}</div>
+      {selectedView.hint && <div className="mood-viz-introduction"><p>{selectedView.hint}</p></div>}
+      {view === 'trend' && <MoodTrendChart dates={dates} entries={entries} activeDate={activeDate} onChooseDate={onChooseDate} />}
+      {view === 'original' && <div className="mood-viz-original">{children}</div>}
+      {view === 'bubbles' && <BubbleReflection days={days} activeDate={activeDate} onChooseDate={onChooseDate} />}
+    </section>
+    {renderDetails(view === 'trend')}
+  </>
 }
 
 function BubbleReflection({ days, activeDate, onChooseDate }: ReflectionChartProps) {

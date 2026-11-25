@@ -1,91 +1,58 @@
 .mood-trend {
   --trend-ink: var(--ink, currentColor);
   --trend-muted: var(--ink-soft, var(--muted));
-  --trend-accent: var(--accent-strong, var(--accent));
-  --trend-wash: color-mix(in srgb, var(--accent) 8%, var(--surface));
+  --trend-pen: color-mix(in srgb, var(--ink, var(--accent)) 60%, var(--sage, var(--accent)));
+  --trend-mark: var(--accent-strong, var(--seal, var(--accent)));
+  --trend-paper: color-mix(in srgb, var(--surface) 93%, var(--accent));
+  --trend-selection: color-mix(in srgb, var(--accent) 10%, transparent);
+  --trend-serif: 'Noto Serif SC', 'Songti SC', SimSun, Georgia, serif;
   min-width: 0;
-  display: grid;
-  gap: 16px;
-  padding: clamp(14px, 2.1vw, 25px);
-  color: var(--trend-muted);
-  background: linear-gradient(155deg, var(--surface) 48%, var(--trend-wash));
+  container-type: inline-size;
+  color: var(--trend-ink);
+  background: linear-gradient(155deg, var(--surface) 63%, var(--trend-paper));
   border: 1px solid var(--line);
-  border-radius: 15px;
+  border-radius: 16px;
   font-variant-numeric: tabular-nums;
 }
 
-.mood-trend-empty { padding-block: 24px; font-size: 12px; }
+.mood-trend-empty { padding: 24px; color: var(--trend-muted); font-size: 12px; }
 
-.mood-trend-header,
-.mood-trend-readout,
-.mood-trend-moods,
-.mood-trend-caption {
+.mood-trend-spread {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 17px;
+  padding: clamp(13px, 4cqi, 25px);
+}
+
+.mood-trend-ink-page { min-width: 0; }
+
+.mood-trend-ink-page > header {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px 12px;
+  margin-bottom: 20px;
 }
 
-.mood-trend-header { justify-content: space-between; align-items: flex-start; gap: 10px; }
-.mood-trend-readout { gap: 8px 21px; }
-
-.mood-trend-day {
-  display: grid;
-  min-width: 52px;
-  gap: 5px;
+.mood-trend-ink-page h3,
+.mood-trend-day-page h3 {
+  margin: 0;
+  color: var(--trend-ink);
+  font: 500 17px/1.35 var(--trend-serif);
+  letter-spacing: .04em;
 }
 
-.mood-trend-day time { font-size: 11px; }
-.mood-trend-day strong,
-.mood-trend-unrecorded {
-  color: var(--trend-accent);
-  font: 500 32px/.95 var(--serif, serif);
-}
-
-.mood-trend-day strong small { font: 10px/1 var(--sans, sans-serif); }
-.mood-trend-unrecorded { font-size: 17px; }
-
-.mood-trend-record {
-  display: grid;
-  gap: 7px;
-  padding-left: 14px;
-  border-left: 1px solid var(--line);
-  font-size: 11px;
-}
-.mood-trend-moods { gap: 5px 9px; color: var(--trend-ink); }
-.mood-trend-moods > span { display: inline-flex; align-items: center; gap: 5px; }
-.mood-trend-moods i { width: 7px; height: 7px; flex: none; border-radius: 50%; }
-
-.mood-trend .mood-trend-average-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 32px;
-  padding: 4px 9px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
+.mood-trend-ink-page > header span {
   color: var(--trend-muted);
-  background: var(--surface);
-  white-space: nowrap;
   font-size: 11px;
-}
-
-.mood-trend .mood-trend-average-toggle[aria-pressed='true'] {
-  color: var(--trend-accent);
-  border-color: color-mix(in srgb, var(--accent) 29%, var(--line));
-  background: var(--trend-wash);
-}
-
-.mood-trend-average-toggle::before {
-  width: 13px;
-  border-top: 2px dashed currentColor;
-  content: '';
+  white-space: nowrap;
 }
 
 .mood-trend-chart {
-  --mood-trend-height: clamp(130px, 19vw, 185px);
+  --mood-trend-height: clamp(132px, 27cqi, 175px);
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  gap: 10px;
+  gap: 9px;
 }
 
 .mood-trend-scale {
@@ -94,33 +61,28 @@
   justify-content: space-between;
   align-items: end;
   box-sizing: content-box;
-  height: calc(var(--mood-trend-height) + 12px);
+  height: calc(var(--mood-trend-height) + 14px);
   color: var(--trend-muted);
   font-size: 10px;
-  line-height: 12px;
+  line-height: 14px;
 }
-.mood-trend-scale .baseline { color: var(--trend-accent); font-weight: 600; }
+
+.mood-trend-scale .baseline { color: var(--trend-mark); }
 
 .mood-trend-scroll { min-width: 0; overflow-x: auto; scrollbar-width: thin; }
-.mood-trend-track { min-width: calc(var(--mood-trend-days) * 24px); padding: 6px 0 22px; }
-
-.mood-trend-plot {
-  position: relative;
-  height: var(--mood-trend-height);
-  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 5%, transparent), transparent);
-}
-
-.mood-trend-plot > svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; color: var(--trend-accent); }
+.mood-trend-track { min-width: calc(var(--mood-trend-days) * 24px); padding: 7px 0 26px; }
+.mood-trend-plot { position: relative; height: var(--mood-trend-height); }
+.mood-trend-plot > svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; color: var(--trend-pen); pointer-events: none; }
 .mood-trend-plot line { stroke: var(--line); }
-.mood-trend-plot line.baseline { stroke: color-mix(in srgb, var(--accent) 38%, var(--line)); stroke-dasharray: 2 4; }
+.mood-trend-plot line.baseline { stroke: color-mix(in srgb, var(--accent) 25%, var(--line)); }
 .mood-trend-score-path,
 .mood-trend-average-path { fill: none; stroke-linejoin: round; stroke-linecap: round; }
-.mood-trend-score-path { stroke: var(--trend-accent); stroke-width: 2; }
-.mood-trend-average-path { stroke: var(--trend-muted); stroke-width: 1.3; stroke-dasharray: 3 4; }
+.mood-trend-score-path { stroke: var(--trend-pen); stroke-width: 2; }
+.mood-trend-average-path { stroke: var(--trend-muted); stroke-width: 1.2; stroke-dasharray: 3 4; opacity: .66; }
 
 .mood-trend-columns {
   position: absolute;
-  inset: 0;
+  inset: 0 0 -24px;
   display: grid;
   grid-template-columns: repeat(var(--mood-trend-days), minmax(0, 1fr));
 }
@@ -131,29 +93,25 @@
   min-width: 0;
   padding: 0;
   border: 0;
-  border-radius: 4px;
+  border-radius: 7px;
   background: transparent;
 }
 
-.mood-trend .mood-trend-columns > button:is(:hover, [aria-pressed='true']),
-.mood-trend-columns > span.selected {
-  background: color-mix(in srgb, var(--accent) 9%, transparent);
+.mood-trend .mood-trend-columns > button:hover,
+.mood-trend .mood-trend-columns > button[aria-pressed='true'] {
+  background: var(--trend-selection);
 }
 
 .mood-trend .mood-trend-columns > button:focus-visible { outline-offset: -2px; }
-.mood-trend-columns i { position: absolute; left: 50%; transform: translate(-50%, -50%); border-radius: 50%; }
-.mood-trend-score-dot { width: 7px; height: 7px; border: 1.5px solid var(--trend-accent); background: var(--surface); }
-.mood-trend-score-dot[data-complete='true'] { background: var(--trend-accent); }
-.mood-trend-columns button[aria-pressed='true'] .mood-trend-score-dot {
-  width: 10px;
-  height: 10px;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 17%, transparent);
-}
-.mood-trend-average-dot { width: 4px; height: 4px; background: var(--trend-muted); }
+.mood-trend-columns i { position: absolute; left: 50%; translate: -50% -50%; border-radius: 50%; }
+.mood-trend-score-dot { width: 8px; height: 8px; border: 1px solid var(--trend-pen); background: var(--surface); }
+.mood-trend-score-dot[data-complete='true'] { background: var(--trend-pen); }
+.mood-trend-columns button[aria-pressed='true'] .mood-trend-score-dot { border-color: var(--trend-mark); background: var(--trend-mark); }
+.mood-trend-average-dot { width: 4px; height: 4px; background: var(--trend-muted); opacity: .75; }
 
 .mood-trend-columns time {
   position: absolute;
-  top: calc(100% + 6px);
+  top: calc(var(--mood-trend-height) + 6px);
   inset-inline: 0;
   text-align: center;
   color: var(--trend-muted);
@@ -162,5 +120,70 @@
   white-space: nowrap;
 }
 
-.mood-trend-columns :is(.selected, [aria-pressed='true']) time { color: var(--trend-accent); font-weight: 700; }
-.mood-trend-caption { justify-content: space-between; gap: 5px 12px; color: var(--trend-muted); font-size: 10px; }
+.mood-trend-columns button[aria-pressed='true'] time { color: var(--trend-mark); font-weight: 650; }
+.mood-trend-future time { opacity: .62; }
+
+.mood-trend .mood-trend-average-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 29px;
+  margin-top: 8px;
+  padding: 3px 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--trend-muted);
+  background: transparent;
+  font-size: 11px;
+}
+
+.mood-trend .mood-trend-average-toggle[aria-pressed='true'] {
+  border-color: var(--line);
+  background: var(--trend-selection);
+  color: var(--trend-ink);
+}
+
+.mood-trend-average-toggle::before { width: 13px; border-top: 1px dashed currentColor; content: ''; }
+
+.mood-trend-day-page {
+  min-width: 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.mood-trend-day-page h3 { font-size: clamp(17px, 3cqi, 23px); }
+.mood-trend-day-page h3 small { margin-left: 9px; color: var(--trend-muted); font-size: 11px; }
+.mood-trend-day-meta,
+.mood-trend-day-average { color: var(--trend-muted); font-size: 11px; }
+.mood-trend-day-meta { display: flex; flex-wrap: wrap; gap: 4px 9px; margin-top: 7px; }
+.mood-trend-day-meta strong { color: var(--trend-mark); font-weight: 650; }
+.mood-trend-periods { display: grid; gap: 12px; margin: 16px 0 0; }
+.mood-trend-period { display: grid; gap: 4px; min-width: 0; }
+.mood-trend-period dt { display: flex; flex-wrap: wrap; align-items: center; gap: 5px 9px; font: 13px/1.45 var(--trend-serif); }
+.mood-trend-period dd { margin: 0; color: var(--trend-muted); font-size: 11px; line-height: 1.55; overflow-wrap: anywhere; }
+.mood-trend-stamps { display: inline-flex; align-items: center; gap: 4px; }
+.mood-trend-stamps i { width: 9px; height: 9px; border-radius: 2px; rotate: -8deg; }
+.mood-trend-stamps i:nth-child(even) { rotate: 5deg; }
+.mood-trend-period .mood-trend-note {
+  margin-top: 2px;
+  padding-left: 8px;
+  border-left: 1px solid var(--line);
+  color: var(--trend-ink);
+  white-space: pre-wrap;
+}
+.mood-trend-day-average { margin: 13px 0 0; }
+
+@container (min-width: 570px) {
+  .mood-trend-spread { grid-template-columns: minmax(0, 1.62fr) minmax(0, 1fr); gap: 24px; }
+  .mood-trend-day-page { padding: 0 0 0 clamp(17px, 3cqi, 24px); border-top: 0; border-left: 1px solid var(--line); }
+}
+
+@container (max-width: 569px) {
+  .mood-trend-periods { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .mood-trend-period { align-content: start; }
+  .mood-trend-period dt { display: grid; gap: 5px; }
+}
+
+@media (pointer: fine) {
+  .mood-trend-track { min-width: calc(var(--mood-trend-days) * 17px); }
+}

@@ -84,6 +84,50 @@ function MoodReflection({ entries, referenceDate }: { entries: MoodEntry[]; refe
   const firstWeekday = new Date(`${stats.dates[0]}T12:00:00`).getDay()
   const monthOffset = firstWeekday === 0 ? 7 : firstWeekday
 
+  function renderDetails(trend: boolean) {
+    if (!stats.selected.length) return null
+
+    const mode = trend ? 'range' : detailMode
+    const summary = trend ? `查看${rangeLabel}时段汇总` : `查看${activeDateLabel}的原始记录`
+    return (
+      <details
+        key={trend ? 'trend-summary' : 'reflection-details'}
+        className="mood-day-detail"
+        open={trend ? undefined : detailExpanded}
+        onToggle={trend ? undefined : (event) => setDetailExpanded(event.currentTarget.open)}
+        aria-label={trend ? `${rangeLabel}时段汇总` : `${activeDateLabel}早中晚心情详情`}
+      >
+        <summary>{summary}</summary>
+        {!trend && (
+          <header>
+            <span>{mode === 'day' ? activeDateLabel : `${rangeLabel}时段汇总`}</span>
+            <div className="mood-detail-switch">
+              <button type="button" className={mode === 'day' ? 'active' : ''} aria-pressed={mode === 'day'} onClick={() => setDetailMode('day')}>当日</button>
+              <button type="button" className={mode === 'range' ? 'active' : ''} aria-pressed={mode === 'range'} onClick={() => setDetailMode('range')}>{rangeLabel}汇总</button>
+            </div>
+          </header>
+        )}
+        <div className="mood-period-stats">
+          {moodPeriods.map((period) => {
+            const entry = entryFor(activeDate, period.id)
+            const points = mode === 'day' ? entry?.points : stats.byPeriod[period.id]
+            const total = stats.byPeriodCount[period.id]
+            const hasRecord = mode === 'day' ? Boolean(entry) : total > 0
+            return (
+              <div key={period.id}>
+                <span>{period.label}</span>
+                {hasRecord && points ? <MoodBlendBar compact points={points} /> : <span className="mood-reflection-empty" />}
+                <small>{hasRecord && points ? moodSummary(points) : '未记录'}</small>
+                {mode === 'day' && entry?.note && <p>{entry.note}</p>}
+                {mode === 'range' && hasRecord && <p>已记录 {total} 次</p>}
+              </div>
+            )
+          })}
+        </div>
+      </details>
+    )
+  }
+
   return (
     <details className="mood-stats" ref={detailsRef}>
       <summary><span>情绪回望</span><strong>看看情绪如何经过这一段时间</strong></summary>
@@ -107,7 +151,7 @@ function MoodReflection({ entries, referenceDate }: { entries: MoodEntry[]; refe
           <button type="button" disabled={isCurrent} onClick={() => chooseAnchor(today)}>回到{range === 'week' ? '本周' : '本月'}</button>
         </nav>
 
-        <ReflectionVisualizations dates={stats.dates} entries={entries} activeDate={activeDate} onChooseDate={chooseDate}>
+        <ReflectionVisualizations dates={stats.dates} entries={entries} activeDate={activeDate} onChooseDate={chooseDate} renderDetails={renderDetails}>
         {stats.selected.length ? <>
           <section className="mood-overall-tone" aria-label={`${rangeLabel}情绪底色`}>
             <div><span>{rangeLabel}情绪底色</span><small>{moodSummary(stats.totals)}</small></div>
@@ -145,20 +189,6 @@ function MoodReflection({ entries, referenceDate }: { entries: MoodEntry[]; refe
 
         </> : <p>这个范围内还没有心情记录。</p>}
         </ReflectionVisualizations>
-        {stats.selected.length > 0 &&
-          <details className="mood-day-detail" open={detailExpanded} onToggle={(event) => setDetailExpanded(event.currentTarget.open)} aria-label={`${activeDateLabel}早中晚心情详情`}>
-            <summary>查看{activeDateLabel}的原始记录</summary>
-            <header><span>{detailMode === 'day' ? activeDateLabel : `${rangeLabel}时段汇总`}</span><div className="mood-detail-switch"><button type="button" className={detailMode === 'day' ? 'active' : ''} aria-pressed={detailMode === 'day'} onClick={() => setDetailMode('day')}>当日</button><button type="button" className={detailMode === 'range' ? 'active' : ''} aria-pressed={detailMode === 'range'} onClick={() => setDetailMode('range')}>{rangeLabel}汇总</button></div></header>
-            <div className="mood-period-stats">
-              {moodPeriods.map((period) => {
-                const entry = entryFor(activeDate, period.id)
-                const points = detailMode === 'day' ? entry?.points : stats.byPeriod[period.id]
-                const hasRecord = detailMode === 'day' ? Boolean(entry) : stats.byPeriodCount[period.id] > 0
-                return <div key={period.id}><span>{period.label}</span>{hasRecord && points ? <MoodBlendBar compact points={points} /> : <span className="mood-reflection-empty" />}<small>{hasRecord && points ? moodSummary(points) : '未记录'}</small>{detailMode === 'day' && entry?.note && <p>{entry.note}</p>}{detailMode === 'range' && hasRecord && <p>已记录 {stats.byPeriodCount[period.id]} 次</p>}</div>
-              })}
-            </div>
-          </details>
-        }
       </div>
     </details>
   )

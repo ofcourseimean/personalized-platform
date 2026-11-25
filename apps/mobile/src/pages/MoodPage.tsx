@@ -162,6 +162,23 @@ export default function MoodPage({
         entries={entries}
         activeDate={activeDate}
         onChooseDate={setReflectionDate}
+        renderDetails={(trend) => !trend && (
+          <section className="paper-card">
+            <h3>{activeDate} 的原始记录</h3>
+            {dayEntries.length ? (
+              dayEntries.map((entry) => (
+                <div className="mood-detail" key={entry.id}>
+                  <span>{moodPeriods.find((item) => item.id === entry.period)?.label}</span>
+                  <MoodBlendBar points={entry.points} />
+                  <p>{moodSummary(entry.points)}</p>
+                  {entry.note && <p>{entry.note}</p>}
+                </div>
+              ))
+            ) : (
+              <p className="muted">这一天还没有记录，不推断未记录的心情。</p>
+            )}
+          </section>
+        )}
       >
         <div className="mood-ribbons">
           {dates.map((day) => (
@@ -181,21 +198,6 @@ export default function MoodPage({
           ))}
         </div>
       </ReflectionVisualizations>
-      <section className="paper-card">
-        <h3>{activeDate} 的原始记录</h3>
-        {dayEntries.length ? (
-          dayEntries.map((entry) => (
-            <div className="mood-detail" key={entry.id}>
-              <span>{moodPeriods.find((item) => item.id === entry.period)?.label}</span>
-              <MoodBlendBar points={entry.points} />
-              <p>{moodSummary(entry.points)}</p>
-              {entry.note && <p>{entry.note}</p>}
-            </div>
-          ))
-        ) : (
-          <p className="muted">这一天还没有记录，不推断未记录的心情。</p>
-        )}
-      </section>
       </div>
       </div>
     </section>

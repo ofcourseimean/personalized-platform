@@ -36,7 +36,7 @@ describe('mood trend', () => {
     expect(trend[0].score).toBeCloseTo(22)
     expect(trend[0].averageDays).toBe(2)
     expect(trend[0].average).toBeCloseTo(28)
-    expect(trend[1]).toEqual({ date: '2026-11-02', score: null, periods: 0, average: null, averageDays: 0 })
+    expect(trend[1]).toEqual({ date: '2026-11-02', score: null, periods: 0, entries: [], average: null, averageDays: 0 })
     expect(trend[2].averageDays).toBe(2)
     expect(trend[2].average).toBeCloseTo(43.1667)
   })
@@ -54,6 +54,7 @@ describe('mood trend', () => {
 
     expect(day.periods).toBe(3)
     expect(day.score).toBeCloseTo(58.8333)
+    expect(day.entries).toEqual([input[0], input[2], input[3]])
     expect(input).toEqual(before)
   })
 })
