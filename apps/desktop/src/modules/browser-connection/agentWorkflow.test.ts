@@ -51,7 +51,7 @@ it('checks the named streamer through public tools with all five Bilibili domain
   expect(mock.generate).not.toHaveBeenCalled()
 })
 
-it('keeps followed-live queries on the selected managed browser', async () => {
+it.each(['我关注的B站主播有谁在开播', '现在B站有谁开播'])('keeps followed-live queries on the selected managed browser: %s', async message => {
   const data = useLibraryStore.getState().data
   data.companion.browser!.sites = [...bilibiliSetupSites]
   data.companion.permissions.internet = true
@@ -61,7 +61,7 @@ it('keeps followed-live queries on the selected managed browser', async () => {
     expect(args.request).toMatchObject({ kind: 'followed_live', origin: 'https://live.bilibili.com' })
     return { verified: true, privateBrowser: true, data: { loggedIn: true, complete: true, checked: 1, rooms: [{ roomId: 42, name: '虚构主播', liveStatus: 1 }] } }
   })
-  expect(await sendCompanionTurn('我关注的B站主播有谁在开播')).toContain('虚构主播')
+  expect(await sendCompanionTurn(message)).toContain('虚构主播')
   expect(mock.native.mock.calls.map(([command]) => command)).toEqual(['managed_browser_configure', 'managed_browser_request'])
   expect(mock.generate).not.toHaveBeenCalled()
 })

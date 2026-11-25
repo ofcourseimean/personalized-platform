@@ -1,4 +1,5 @@
 import { bilibiliBrowserSites, browserOrigin } from '../../domain/browser'
+import { bilibiliReference } from '../../domain/liveStatusIntent'
 import { matchOperations } from '../../domain/operations/catalog'
 import type { CompanionData } from '../../domain/models'
 import { isMailHost } from './siteProfile'
@@ -15,8 +16,10 @@ export interface BrowserTaskGoal {
   explicitPage?:boolean
 }
 const mail = /(?:邮箱|邮件|收件箱|email|mail|inbox)/iu
+const [bilibiliLivePage, ...bilibiliLiveApiOrigins] = bilibiliBrowserSites
+const bilibiliFamily = { names: bilibiliReference, host: /(?:^|\.)bilibili\.com$/iu }
 const families = [
-  { names: /(?:b\s*站|哔哩|bilibili)/iu, host: /(?:^|\.)bilibili\.com$/iu },
+  bilibiliFamily,
   { names: /(?:qq\s*邮箱|腾讯邮箱)/iu, host: /(?:^|\.)qq\.com$/iu },
   { names: /(?:网易|163|126)/iu, host: /(?:^|\.)(?:163|126)\.com$/iu },
   { names: /(?:gmail|谷歌邮箱|google\s*mail)/iu, host: /(?:^|\.)(?:google|gmail)\.com$/iu },
@@ -45,6 +48,11 @@ export function resolveBrowserTask(message: string, companion: CompanionData): B
   if (parsed.invalid) return { objective, origins: [], candidates: [], clarification: '请提供不带账号、密码或端口的HTTPS页面链接；不会从无效链接回退猜测其他账号。' }
   const namedFamilies = families.filter(family => family.names.test(message))
   const namedProfiles=companion.browser?.profiles?.filter(profile=>profile.label&&profile.label.length>=2&&message.toLocaleLowerCase().includes(profile.label.toLocaleLowerCase()))??[]
+  const implicitBilibiliPage = objective === 'page' && !explicit.length && !namedProfiles.length
+    && namedFamilies.length === 1 && namedFamilies[0] === bilibiliFamily
+  if (objective === 'followed_live' && explicit.some(origin => !bilibiliFamily.host.test(new URL(origin).hostname))) {
+    return { objective, origins: [], candidates: [], clarification: '你想查 B 站的关注开播名单，还是查看消息里给出的另一个网站？' }
+  }
   const learned = matchOperations(companion.operations ?? [], message).flatMap(candidate => {
     const method = companion.operations?.find(item => item.id === candidate.id && item.scope === 'browser')
     if (!method || (method.pattern?.includes('browser.followed_live') && objective !== 'followed_live')) return []
@@ -64,6 +72,12 @@ export function resolveBrowserTask(message: string, companion: CompanionData): B
   })
   if (!explicit.length && !candidates.length && objective !== 'updates') candidates = [...new Set(learned.filter(site => !namedFamilies.length || namedFamilies.some(family => family.host.test(new URL(site).hostname))))]
   if (objective === 'followed_live') candidates = [...bilibiliBrowserSites]
+  if (implicitBilibiliPage) {
+    candidates = candidates.filter(origin => !bilibiliLiveApiOrigins.includes(origin))
+    if (/(?:直播区|直播广场|直播首页|直播主页)/u.test(message)) candidates = [bilibiliLivePage]
+    else if (/(?:B\s*站|哔哩哔哩|bilibili)(?:的)?(?:主页|首页)/iu.test(message)) candidates = ['https://www.bilibili.com']
+    else if (/(?:B\s*站|哔哩哔哩|bilibili)(?:的)?动态(?:页)?/iu.test(message)) candidates = ['https://t.bilibili.com']
+  }
   const privateCue = /(?:浏览器|Edge|已登录|我的|我关注|账号|账户|私人|通知|订单|收藏|邮箱)/iu.test(message)
   if(objective==='page'&&/(?:公开|匿名|全站|热门|推荐|新闻)/u.test(message)&&!privateCue)return
   if(objective==='page'&&!explicit.length&&!candidates.length&&!namedFamilies.length&&privateCue){
@@ -84,7 +98,9 @@ export function resolveBrowserTask(message: string, companion: CompanionData): B
   else if (!candidates.length) clarification = objective === 'updates'
     ? '你问的是关注UP的视频或动态更新，不是开播名单。请在「Edge浏览器连接」添加动态页网站 https://t.bilibili.com，并连接该网站；我只读取本次页面，直播接口不能回答更新问题。'
     : objective === 'mail' ? '暂时无法从已绑定网站确认你指的是哪一个邮箱。请告诉我邮箱网站名称或域名；首次明确后，成功流程可以用于之后同类查询。不会遍历其他网站。' : '请告诉我本次要查看的网站名称或域名。'
-  else if (origins.length > 1 && objective !== 'followed_live') clarification = `本次有多个目标网站：${origins.map(site => new URL(site).hostname).join('、')}。${objective === 'mail' ? '你想检查哪一个邮箱？' : '请指定一个网站。'}不会自动遍历所有账号。`
+  else if (origins.length > 1 && objective !== 'followed_live') clarification = implicitBilibiliPage
+    ? '你想在 B 站查什么？可以说「查看 B 站直播首页」或「查看 B 站动态」，也可以给我具体页面链接。'
+    : `本次有多个目标网站：${origins.map(site => new URL(site).hostname).join('、')}。${objective === 'mail' ? '你想检查哪一个邮箱？' : '请指定一个网站。'}不会自动遍历所有账号。`
   const interactionAllowed=origins.length===1&&companion.browser?.interactionSites?.includes(origins[0])===true
   const downloadAllowed=interactionAllowed&&companion.browser?.backend==='managed'&&requestsAttachment(message)
   const explicitPage=origins.length===1&&[...message.matchAll(/https:\/\/[^\s，。；;"'\\<>）)]+/gu)].some(([value])=>{

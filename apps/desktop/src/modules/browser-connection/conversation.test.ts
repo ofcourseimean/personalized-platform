@@ -18,12 +18,15 @@ beforeEach(()=>{
   data.companion.messages=[{id:'fixture-history',role:'user',content:'PRIVATE-OLD-HISTORY',createdAt:new Date().toISOString(),contextSummary:''}];useLibraryStore.setState({data,saveStatus:'idle'})
 })
 describe('real CompanionTurn browser and automatic learning wiring',()=>{
-  it.each(['现在B站UP主里面，有谁在开播啊？','现在B站有up主开播了吗'])('runs aggregate screenshot without guessing among Bilibili service domains: %s',async message=>{
+  it.each(['现在B站有谁开播','哔哩哔哩现在哪些在播','现在B站UP主里面，有谁在开播啊？','现在B站有up主开播了吗'])('runs aggregate screenshot without guessing among Bilibili service domains: %s',async message=>{
     useLibraryStore.getState().data.companion.browser!.sites.push('https://t.bilibili.com','https://www.bilibili.com')
     calls.native.mockResolvedValue({verified:true,data:{loggedIn:true,rooms:[{uid:1,roomId:12,name:'虚构开播UP',liveStatus:1}],checked:1,total:1,complete:true}})
     const reply=await sendCompanionTurn(message)
-    expect(reply).toContain('虚构开播UP');expect(reply).not.toContain('多个目标网站')
-    expect(calls.generate).not.toHaveBeenCalled();expect(calls.native.mock.calls[0][1].request.kind).toBe('followed_live')
+    expect(reply).toContain('关注主播');expect(reply).toContain('虚构开播UP')
+    expect(calls.generate).not.toHaveBeenCalled()
+    expect(calls.native).toHaveBeenCalledExactlyOnceWith('browser_bridge_request', expect.objectContaining({
+      request: expect.objectContaining({ kind:'followed_live', origin:bilibiliBrowserSites[0] }),
+    }))
   })
   it('handles the screenshot request without a model call, auto learns, and never retains private results',async()=>{
     calls.native.mockResolvedValue({verified:true,untrusted:true,privateBrowser:true,origin:'https://live.bilibili.com',fetchedAtEpochMs:Date.now(),data:{loggedIn:true,rooms:[{uid:1,roomId:12,name:'PRIVATE-LIVE-NAME',title:'PRIVATE-LIVE-TITLE',liveStatus:1}],checked:1,total:null,complete:false}})

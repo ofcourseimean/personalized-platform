@@ -26,12 +26,23 @@ describe('current task objective and target matrix',()=>{
     expect(followedLiveIntent('B站某个主播开播了没')).toBe(false)
     expect(browserObjective('B站哪些UP主更新视频了，不要直播')).toBe('updates')
   })
-  it.each(['现在B站有up主开播了吗','B站有没有主播正在直播','B站UP主有开播的吗','B站还有主播在播吗','看看哔哩哔哩哪些UP主在直播'])('defaults a quantified live group to the current follow list: %s',message=>{
+  it.each(['现在B站有谁开播','现在 B 站都有谁开播啊','哔哩哔哩现在哪些在播','小鱼，B站谁这会儿开播了','B站正在直播的都有谁','现在B站有up主开播了吗','B站有没有主播正在直播','B站UP主有开播的吗','B站还有主播在播吗','看看哔哩哔哩哪些UP主在直播'])('defaults a live group to the current follow list: %s',message=>{
     expect(followedLiveIntent(message)).toBe(true)
     expect(resolveBrowserTask(message,companion([...bilibiliBrowserSites,'https://www.bilibili.com','https://t.bilibili.com']))?.origins).toEqual(bilibiliBrowserSites)
   })
-  it.each(['B站UP主卡莎开播了吗','B站天才美少女卡莎开播了没','B站全站有哪些主播开播','推荐B站正在直播的UP主','不要查询B站有up主开播吗','B站哪些UP主有新视频，不要直播'])('does not reinterpret named/public/negative/update requests as follows: %s',message=>{
+  it.each(['B站UP主卡莎开播了吗','B站天才美少女卡莎开播了没','B站全站有谁开播','B站全站有哪些主播开播','推荐B站正在直播的UP主','不要查询B站有up主开播吗','帮我别查B站有谁开播','B站哪些UP主有新视频，不要直播'])('does not reinterpret named/public/negative/update requests as follows: %s',message=>{
     expect(followedLiveIntent(message)).toBe(false)
+  })
+  it('uses human-facing pages for Bilibili page choices and keeps exact origin grants', () => {
+    const data = companion([...bilibiliBrowserSites,'https://t.bilibili.com','https://www.bilibili.com'])
+    expect(resolveBrowserTask('查看B站直播首页', data)?.origins).toEqual([bilibiliBrowserSites[0]])
+    expect(resolveBrowserTask('查看B站动态', data)?.origins).toEqual(['https://t.bilibili.com'])
+    const task = resolveBrowserTask('查看我的B站网页', data)
+    expect(task?.clarification).toContain('你想在 B 站查什么')
+    expect(task?.candidates).toEqual([bilibiliBrowserSites[0],'https://t.bilibili.com','https://www.bilibili.com'])
+    expect(resolveBrowserTask('现在B站有谁开播', companion([bilibiliBrowserSites[0]]))?.clarification).toContain('尚未在一隅授权')
+    expect(resolveBrowserTask('现在B站有谁开播 mail.example.com', data)?.origins).toEqual([])
+    expect(resolveBrowserTask('查看B站 https://live.bilibili.com/42', data)).toMatchObject({origins:[bilibiliBrowserSites[0]],explicitPage:true})
   })
   it.each(['https://mail.qq.com','https://exmail.qq.com','https://wx.mail.qq.com','https://mail.google.com','https://outlook.live.com','https://outlook.office.com','https://mail.163.com','https://mail.126.com','https://webmail.example.com','https://owa.example.com','https://qiye.aliyun.com','https://mail.proton.me'])('resolves a unique bound mail site, not all authorised sites: %s',site=>{
     const task=resolveBrowserTask('查看一下我的邮箱里有新邮件吗',companion([...bilibiliBrowserSites,'https://github.com',site]))

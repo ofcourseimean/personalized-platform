@@ -10,7 +10,6 @@ import type { AgentPermissionRequest, AgentRuntimeStatus } from './agent/types'
 import { resolveDirectAction } from './agent/directActions'
 import { clearFolderChoice, prepareFolderFlow } from './agent/folderFlow'
 import { localRitualTools } from './agent/ritualTools'
-import { resolveBrowserTask } from '../browser-connection/taskGoal'
 import { prepareOperationTurn, finishOperationTurn, offerOperationTraining } from '../operation-memory/turn'
 import type { OperationSelection } from '../../domain/operations/types'
 import { prepareBrowserTurn, rememberBrowserTurn, forgetBrowserTurn } from '../browser-connection/taskSession'
@@ -56,14 +55,15 @@ export async function sendCompanionTurn(message: string, options: CompanionTurnO
   const clean=prepared?.message??userText
   if (!privateSession && !folderFlow) new PrivacySession([]).sanitize(clean)
   const taskText = operation?.goal ?? clean
-  const privateBrowserQuery = Boolean(resolveBrowserTask(taskText, data.companion)) || operation?.scope === 'browser'
+  const access = buildAgentAccess(data, temporaryCompanionWorkIds)
+  const services = createLiveCompanionApplicationServices(data, access, options.requestPrivacyReview, options.signal, taskText)
+  const privateBrowserQuery = Boolean(services.browserTaskGoal) || operation?.scope === 'browser'
   const displayTransient = (role: CompanionMessage['role'], content: string) => {
     if (options.signal?.aborted) return
     const item: CompanionMessage = { id: `transient-${crypto.randomUUID()}`, role, content, createdAt: new Date().toISOString(), localOnly: true }
     options.onTransientMessage?.(item)
   }
   if (!options.resumeBrowserTask&&(operation || folderFlow || privateBrowserQuery || !data.settings.trust.retainConversationHistory)) displayTransient('user', userText)
-  const access = buildAgentAccess(data, temporaryCompanionWorkIds)
   const registry = createCompanionToolRegistry(options.onVisualState)
   const localAction = resolveDirectAction(taskText, registry.definitions(), data.companion.name)
   if (!folderFlow && (!localAction || !localRitualTools.has(localAction.name))) assertExternalAiAllowed(data.companion.provider.providerId, data.settings.trust, 'companion')
@@ -71,7 +71,6 @@ export async function sendCompanionTurn(message: string, options: CompanionTurnO
   // Shared conversation never implicitly attaches local documents or memories.
   // Any actual tool use keeps the entire turn local, even in ordinary mode.
   const context = operation || privateBrowserQuery || !privateSession ? { page: operation ? 'operation-memory' : privateBrowserQuery ? 'browser-query' : 'shared-chat', companion: fullContext.companion, localTime: fullContext.localTime } : fullContext
-  const services = createLiveCompanionApplicationServices(data, access, options.requestPrivacyReview, options.signal, taskText)
   const assertBrowserAllowed = privateBrowserQuery && data.companion.browser?.enabled ? services.assertBrowserAuthority : undefined
   const authorizeBrowserSend = assertBrowserAllowed && services.browserTaskGoal?.origins.length && !data.companion.browser?.confirmQueryEgress ? services.authorizeBrowserQueryEgress : undefined
   const permissions = new AgentPermissionEngine(() => {
@@ -155,11 +154,12 @@ export async function sendCompanionTurn(message: string, options: CompanionTurnO
     if (!operation && !options.signal?.aborted && (askingForStreamer || result.audit.some(entry => entry.toolName === 'web.live_status' || entry.toolName === 'web.search'))) {
       rememberLiveStatusTarget(clean, data.companion.name, taskChannel)
     }
-    if(data.companion.operationLearning?.enabled!==false&&prepared?.resolvedFromClarification&&prepared.task?.origins.length===1&&result.audit.some(item=>item.toolName==='browser.verify'&&item.resultStatus==='success')){
-      const role=prepared.task.objective==='mail'?'mail':prepared.task.objective==='page'&&/(?:通知|公告|门户)/u.test(clean)?'portal':undefined
-      if(role)useLibraryStore.getState().setCompanionBrowser({preferredSites:{...useLibraryStore.getState().data.companion.browser?.preferredSites,[role]:prepared.task.origins[0]}})
+    const browserTask = services.browserTaskGoal
+    if(data.companion.operationLearning?.enabled!==false&&prepared?.resolvedFromClarification&&browserTask?.origins.length===1&&result.audit.some(item=>item.toolName==='browser.verify'&&item.resultStatus==='success')){
+      const role=browserTask.objective==='mail'?'mail':browserTask.objective==='page'&&/(?:通知|公告|门户)/u.test(clean)?'portal':undefined
+      if(role)useLibraryStore.getState().setCompanionBrowser({preferredSites:{...useLibraryStore.getState().data.companion.browser?.preferredSites,[role]:browserTask.origins[0]}})
     }
-    if(!operation&&!options.signal?.aborted&&(!prepared?.task?.downloadAllowed||result.execution.phase==='clarifying'))rememberBrowserTurn(prepared?.task,useLibraryStore.getState().data.companion,taskChannel,clean)
+    if(!operation&&!options.signal?.aborted&&(!browserTask?.downloadAllowed||result.execution.phase==='clarifying'))rememberBrowserTurn(browserTask,useLibraryStore.getState().data.companion,taskChannel,clean)
     const transientReply = operation || folderFlow || privateBrowserQuery || result.audit.some(entry => entry.toolName.startsWith('browser.') && entry.toolName !== 'browser.status') || !data.settings.trust.retainConversationHistory
     if (transientReply) displayTransient('companion', result.text)
     else if (!options.signal?.aborted) {

@@ -1,6 +1,13 @@
 import { beforeEach,describe,expect,it,vi } from 'vitest'
 import { createSeedLibrary } from '../../domain/seed'
-import { prepareBrowserTurn,rememberBrowserTurn,forgetBrowserTurn } from './taskSession'
+import type { CompanionData } from '../../domain/models'
+import { resolveBrowserTask } from './taskGoal'
+import { prepareBrowserTurn as continueBrowserTurn,rememberBrowserTurn,forgetBrowserTurn } from './taskSession'
+
+function prepareBrowserTurn(message: string, companion: CompanionData, channel?: string) {
+  const turn = continueBrowserTurn(message, companion, channel)
+  return { ...turn, task: resolveBrowserTask(turn.message, companion) }
+}
 beforeEach(()=>{forgetBrowserTurn('main');forgetBrowserTurn('desktop');vi.useRealTimers()})
 describe('private task slots without private page history',()=>{
   it('retains an unresolved attachment request when the user clarifies the course',()=>{

@@ -164,7 +164,8 @@ export async function runAgent(input: RunAgentInput) {
   messages.push({ role: 'system', content: QUERY_INTENT_PROMPT })
   messages.push({ role: 'system', content: `本轮权限状态：${JSON.stringify(input.permissions.summary())}。完整程序权限仅授权已登记的程序内 Tool，不是全部 UI 或电脑的万能权限。必须区分“未接入动作”“用户关闭授权”“需要执行确认”“模块已关闭”和“执行失败”；没有 PermissionDenied 结果不得声称无权限。app.capabilities 可核对各模块的查询与写入。fortune.draw、truth.draw、answer_book.draw 是本地真实抽取，用户要求时调用对应 Tool；不自行生成签文，也不把 app.open 当作抽取完成。` })
   const actionIntent = input.operation ? { expectsTool: false } : detectActionIntent(input.message, toolDefinitions, input.context.companion.name)
-  const followedQuery = !input.operation && followedLiveIntent(input.message) && Boolean(input.registry.lookup('browser.followed_live'))
+  const followedQuery = !input.operation && Boolean(input.registry.lookup('browser.followed_live')) &&
+    (browserTask ? browserTask.objective === 'followed_live' : !input.services.assertBrowserAuthority && followedLiveIntent(command))
   const liveName = followedQuery ? undefined : actionIntent.liveRoomName ?? actionIntent.liveStatusName
   const liveRoomFlow = liveName ? new LiveRoomFlow(liveName, toolDefinitions, actionIntent.liveStatusName ? 'status' : 'open', showSources) : undefined
   const publicReads = new PublicReadBudget()
