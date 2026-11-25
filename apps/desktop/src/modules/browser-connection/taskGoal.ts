@@ -3,6 +3,7 @@ import { bilibiliReference } from '../../domain/liveStatusIntent'
 import { matchOperations } from '../../domain/operations/catalog'
 import type { CompanionData } from '../../domain/models'
 import { isMailHost } from './siteProfile'
+import type { BrowserSiteCardData } from './siteDirectory'
 
 import { browserObjective, type BrowserObjective } from './taskIntent'
 export { browserObjective, followedLiveIntent, type BrowserObjective } from './taskIntent'
@@ -14,6 +15,8 @@ export interface BrowserTaskGoal {
   interactionAllowed?:boolean
   downloadAllowed?:boolean
   explicitPage?:boolean
+  siteChoice?: boolean
+  publicSearch?: boolean
 }
 const mail = /(?:邮箱|邮件|收件箱|email|mail|inbox)/iu
 const [bilibiliLivePage, ...bilibiliLiveApiOrigins] = bilibiliBrowserSites
@@ -35,11 +38,30 @@ function explicitSites(message: string) {
   }
   // Match complete hostname tokens, not substrings such as qq.com in qq.com.evil.net.
   const bare = message.replace(/https?:\/\/[^\s，。；;"'\\<>）)]+/gu, ' ')
-  for (const match of bare.matchAll(/(?<![a-z0-9.-])(?:[a-z0-9-]+\.)+[a-z]{2,}(?![a-z0-9.-])/giu)) {
+  for (const match of bare.matchAll(/(?<![a-z0-9.@-])(?:[a-z0-9-]+\.)+[a-z]{2,}(?![a-z0-9.-])/giu)) {
     if (/\.(?:pdf|docx|pptx|xlsx)$/iu.test(match[0])) continue
     try { found.add(browserOrigin(`https://${match[0]}`)) } catch { /* invalid token */ }
   }
   return { sites: [...found], invalid }
+}
+
+export function hasExplicitBrowserTarget(message: string) {
+  const parsed = explicitSites(message)
+  return parsed.invalid || parsed.sites.length > 0
+}
+
+export function bindBrowserSite(message: string, companion: CompanionData, card: BrowserSiteCardData): BrowserTaskGoal {
+  const { origin, label } = card
+  const browser = companion.browser
+  const objective = card.role === 'mail' ? 'mail' : 'page'
+  if (!browser?.sites.includes(origin)) {
+    return { objective, origins: [], candidates: [origin], clarification: `这项任务适合在「${label}」处理。请到浏览器连接添加并授权 ${new URL(origin).hostname}。` }
+  }
+  const interactionAllowed = browser.interactionSites?.includes(origin) === true
+  const downloadAllowed = interactionAllowed && browser.backend === 'managed' && requestsAttachment(message)
+  // An account request retains the configured browser even on a site with an anonymous search preset.
+  const publicSearch = card.publicSearch && !/(?:我的|我关注|收藏|登录|历史|未读)/u.test(message) && !requestsAttachment(message)
+  return { objective, origins: [origin], candidates: [origin], interactionAllowed, ...(downloadAllowed ? { downloadAllowed } : {}), ...(publicSearch ? { publicSearch: true } : {}) }
 }
 export function resolveBrowserTask(message: string, companion: CompanionData): BrowserTaskGoal | undefined {
   const objective = browserObjective(message, companion.name)

@@ -20,11 +20,11 @@ export interface BrowserServices {
   browserCollect?(request:CollectionRequest):Promise<unknown>
   browserVerifyCollection?(request:CollectionEvidence):Promise<unknown>
 }
-export function createBrowserServices(goal: string, signal?: AbortSignal): BrowserServices {
+export function createBrowserServices(goal: string, signal?: AbortSignal, chosenTask?: BrowserTaskGoal): BrowserServices {
   const initial = useLibraryStore.getState().data
   const managed=initial.companion.browser?.backend==='managed'
   const identity = JSON.stringify([initial.companion.browser, initial.companion.provider, initial.settings.trust, initial.companion.permissions.fullAccess, initial.companion.permissions.internet])
-  const task = resolveBrowserTask(goal, initial.companion)
+  const task = chosenTask ?? resolveBrowserTask(goal, initial.companion)
   const requested = task?.origins ?? []
   const execution=new BrowserExecution(task,goal)
   let loginUsed = false
@@ -36,6 +36,9 @@ export function createBrowserServices(goal: string, signal?: AbortSignal): Brows
     if (signal?.aborted) throw new DOMException('浏览器读取已取消', 'AbortError')
     if (!browserAccessEnabled()) throw new Error('浏览器连接、联网权限或外部模型处理未开启；请在AI伙伴设置中核对')
     const live = useLibraryStore.getState().data
+    if (chosenTask && requested.some(origin => !live.companion.browser?.sites.includes(origin))) {
+      throw new Error('所选网站的授权已改变，本次查询已停止')
+    }
     if (JSON.stringify([live.companion.browser, live.companion.provider, live.settings.trust, live.companion.permissions.fullAccess, live.companion.permissions.internet]) !== identity) throw new Error('浏览器范围、模型或隐私设置已改变，本次读取已停止')
     assertExternalAiAllowed(live.companion.provider.providerId, live.settings.trust, 'companion')
   }

@@ -15,6 +15,8 @@ import { ExecutionSession } from '../../task-kernel/session'
 import { browserTaskPrompt } from '../../browser-connection/taskGoal'
 import { isBrowserConnectionCheck } from '../../browser-connection/taskIntent'
 import { BrowserQueryFlow, browserPurposeBlock, unboundBrowserToolBlock } from '../../browser-connection/queryFlow'
+import { PublicSiteFlow } from '../../browser-connection/publicSiteFlow'
+import { librarySeatOrigin, prepareLibrarySeatQuery } from '../../browser-connection/librarySeats'
 import { AttachmentFlow } from '../../browser-connection/attachmentFlow'
 import { followedLiveReply } from '../../browser-connection/followedReply'
 import { ReplySession } from '../replies/session'
@@ -144,12 +146,16 @@ export async function runAgent(input: RunAgentInput) {
     execution.transition('clarifying')
     return finishLocal('你想查哪位主播？告诉我直播昵称就可以。', true)
   }
-  if (browserTask) messages.push({ role: 'system', content: browserTaskPrompt(browserTask) })
-  const browserFlow = !input.operation && browserTask ? new BrowserQueryFlow(browserTask, input.message) : undefined
+  const publicSite = !input.operation && browserTask?.publicSearch && browserTask.origins.length === 1 ? new PublicSiteFlow(browserTask.origins[0], command) : undefined
+  const librarySeats = !input.operation && browserTask?.origins[0] === librarySeatOrigin && browserTask.origins.length === 1
+    && !browserTask.explicitPage ? prepareLibrarySeatQuery(command) : undefined
+  if (librarySeats?.reply) return finishLocal(librarySeats.reply, true)
+  if (browserTask) messages.push({ role: 'system', content: publicSite?.prompt ?? browserTaskPrompt(browserTask) })
+  const browserFlow = !input.operation && browserTask && !publicSite && !librarySeats ? new BrowserQueryFlow(browserTask, input.message) : undefined
   const attachmentFlow = browserTask?.downloadAllowed && !input.operation ? new AttachmentFlow(input.message) : undefined
   messages.push({ role: 'system', content: OPERATION_PROMPT })
   const operationSearch = input.registry.lookup('operation.search')
-  if (!folderFlow && !input.operation && operationSearch && input.permissions.check(operationSearch.definition, { query: input.message }).allowed) {
+  if (!folderFlow && !publicSite && !librarySeats && !input.operation && operationSearch && input.permissions.check(operationSearch.definition, { query: input.message }).allowed) {
     const candidates = input.services.findOperations?.(input.message) ?? []
     experience = automaticMethodHint(input.message, candidates, input.services)
     if (input.context.page === 'browser-query' && experience?.scope !== 'browser') experience = undefined
@@ -169,7 +175,7 @@ export async function runAgent(input: RunAgentInput) {
   const liveName = followedQuery ? undefined : actionIntent.liveRoomName ?? actionIntent.liveStatusName
   const liveRoomFlow = liveName ? new LiveRoomFlow(liveName, toolDefinitions, actionIntent.liveStatusName ? 'status' : 'open', showSources) : undefined
   const publicReads = new PublicReadBudget()
-  const browserReads = new BrowserReadBudget(Boolean(browserTask) || input.context.page === 'browser-query' || followedQuery || input.operation?.scope === 'browser' || experience?.scope === 'browser')
+  const browserReads = new BrowserReadBudget(!publicSite && !librarySeats && (Boolean(browserTask) || input.context.page === 'browser-query' || followedQuery || input.operation?.scope === 'browser' || experience?.scope === 'browser'))
   const methodWrites = new Set<string>()
   let modelRounds = 0
   messages.push({ role: 'system', content: PUBLIC_READ_PROMPT })
@@ -181,7 +187,7 @@ export async function runAgent(input: RunAgentInput) {
   const taskPlanRequired = !followedQuery && Boolean(actionIntent.requiresTaskPlan)
   const modelToolDefinitions = (taskPlanRequired
     ? toolDefinitions.filter((tool) => tool.name === 'task.create') : toolDefinitions).filter(tool => (!input.operation || operationAllows(input.operation.scope, tool)) && (!experience || operationAllows(experience.scope, tool)) && !browserBlock(tool.name) && !browserPurposeBlock(input.message, {id:'definition',name:tool.name,arguments:{}}, browserTask))
-  let directAction = folderStart?.nextCall ?? browserFlow?.initialCall ?? browserCheck ?? (followedQuery ? {id:`browser-direct-${crypto.randomUUID()}`,name:'browser.followed_live',arguments:{}} : liveRoomFlow?.initialCall ?? actionIntent.directCall)
+  let directAction = folderStart?.nextCall ?? browserFlow?.initialCall ?? publicSite?.initialCall ?? librarySeats?.call ?? browserCheck ?? (followedQuery ? {id:`browser-direct-${crypto.randomUUID()}`,name:'browser.followed_live',arguments:{}} : liveRoomFlow?.initialCall ?? actionIntent.directCall)
   let actionRetryUsed = false
   let malformedToolRetryUsed = false
   let verificationRetry=false
@@ -204,7 +210,7 @@ export async function runAgent(input: RunAgentInput) {
         const bufferActionResponse = actionIntent.expectsTool && !toolAttempted
         const answerInstruction = reply.answerInstruction
         response = await withCancellation(input.provider.generate(
-          { messages: answerInstruction ? [...messages, { role: 'system', content: answerInstruction }] : messages, context: input.context, tools: answerRepairUsed ? [] : modelToolDefinitions.filter(tool => publicReads.allows(tool) && browserReads.allows(tool)) },
+          { messages: answerInstruction ? [...messages, { role: 'system', content: answerInstruction }] : messages, context: input.context, tools: answerRepairUsed ? [] : modelToolDefinitions.filter(tool => publicSite ? publicSite.allowsTool(tool.name) : publicReads.allows(tool) && browserReads.allows(tool)) },
           {
             onTextDelta: bufferActionResponse || reply.hasTools ? undefined : (delta) => {
               streamedThisStep = true
@@ -235,6 +241,14 @@ export async function runAgent(input: RunAgentInput) {
     }
     if (response.type === 'text') {
       guard()
+      if (publicSite && !publicSite.hasPageEvidence) {
+        if (!verificationRetry) {
+          verificationRetry = true
+          messages.push({ role: 'system', content: '还未核对公开页面，请先用 web.read_page 读取候选链接，再形成结论。' })
+          continue
+        }
+        return finishLocal('找到了搜索线索，但暂时无法从该站点核对答案。', true)
+      }
       if(browserFlow?.requiresVerification){
         if(!verificationRetry){verificationRetry=true;messages.push({role:'system',content:attachmentFlow?'附件尚未下载。可以继续本轮授权内的操作，或只询问缺少的目标信息。不能用网页文字代替文件回执。':'已读取页面但任务尚无核验证据。请根据当前正文调用browser.verify，或在授权内继续观察/导航；证据不足不能假装查完。'});continue}
         if(attachmentFlow){
@@ -289,7 +303,9 @@ export async function runAgent(input: RunAgentInput) {
     const purposeBlock = browserBlock(call.name) ?? browserPurposeBlock(input.message, call, browserTask)
     const localDelivery = attachmentFlow?.owns(call) === true
     const verificationBeforeDownload=attachmentFlow&&['browser.verify','browser.verify_collection'].includes(call.name)?'本轮需要下载文件，页面文字不能替代下载回执':undefined
-    const readBlock = purposeBlock ?? scopeBlock ?? verificationBeforeDownload ?? (localDelivery ? undefined : browserReads.check(call, tool?.definition) ?? (trustedRoomOpen ? undefined : publicReads.check(call, tool?.definition)))
+    const siteBlock = publicSite?.authorize(call)
+    const trustedPublicOpen = Boolean(publicSite && call.name === 'system.open' && !siteBlock)
+    const readBlock = purposeBlock ?? scopeBlock ?? siteBlock ?? verificationBeforeDownload ?? (localDelivery ? undefined : browserReads.check(call, tool?.definition) ?? (trustedRoomOpen || trustedPublicOpen ? undefined : publicReads.check(call, tool?.definition)))
     let decision = tool ? input.permissions.check(tool.definition, call.arguments) : { allowed: true, reason: '工具不存在，由 Registry 返回错误' }
     if (readBlock) decision = { allowed: false, reason: readBlock }
     let confirmed = false
@@ -305,8 +321,9 @@ export async function runAgent(input: RunAgentInput) {
       ? input.requestPermission ? '用户取消了这次操作' : '当前界面无法显示操作确认'
       : decision.reason
     if (permitted && writeKey) methodWrites.add(writeKey)
-    const result = permitted ? await withCancellation(input.registry.execute(call, input.services, { confirmed, automaticPermission:decision.allowed }), input.signal) : permissionDeniedResult(denialReason)
+    const rawResult = permitted ? await withCancellation(input.registry.execute(call, input.services, { confirmed, automaticPermission:decision.allowed }), input.signal) : permissionDeniedResult(denialReason)
     guard()
+    const result = publicSite?.project(call, rawResult) ?? rawResult
     const durationMs = Math.max(0, Math.round(performance.now() - started))
     const auditRecord: AgentAuditRecord = {
       id: `agent-audit-${crypto.randomUUID()}`,
@@ -334,6 +351,16 @@ export async function runAgent(input: RunAgentInput) {
     }
     browserReads.accept(call, result)
     reply.accept({ call, result, definition: tool?.definition })
+    if (librarySeats?.call === call) return finishLocal(librarySeats.summarize(result), true)
+    if (siteBlock) return finishLocal(siteBlock, true)
+    const opened = publicSite?.openReply(call, result)
+    if (opened) return finishLocal(opened, true)
+    if (publicSite && call === publicSite.initialCall && !result.success) {
+      return finishLocal(`本次站内公开搜索未完成。${safeError(result.error?.message ?? '')}`, true)
+    }
+    if (publicSite && call === publicSite.initialCall && result.success && Array.isArray(result.data) && !result.data.length) {
+      return finishLocal('这个站点没有返回能核对的搜索结果。可以补充名称或给我具体页面。', true)
+    }
     if (call === browserCheck) return finishLocal('')
     const attachmentNext=attachmentFlow?.advance(call,result)
     if(attachmentNext?.reply)return finishLocal(attachmentNext.reply,true)

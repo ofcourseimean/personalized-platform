@@ -14,6 +14,7 @@ import { createAssignmentWriteServices } from './assignmentServices'
 import { createPublicReadServices } from './web/publicReadServices'
 import { createOperationServices } from '../operation-memory/services'
 import { createBrowserServices } from '../browser-connection/services'
+import type { BrowserTaskGoal } from '../browser-connection/taskGoal'
 
 const isoDate = /^\d{4}-\d{2}-\d{2}$/
 const clockTime = /^([01]\d|2[0-3]):[0-5]\d$/
@@ -42,13 +43,14 @@ export function createLiveCompanionApplicationServices(
   requestPrivacyReview?: (request: PrivacyReviewRequest) => Promise<boolean>,
   signal?: AbortSignal,
   browserGoal = '',
+  chosenBrowserTask?: BrowserTaskGoal,
 ) {
   return withLiveAgentReads(createAgentApplicationServices(data, access, {
     ...createRitualServices(),
     ...createAssignmentWriteServices(),
     ...createPublicReadServices(requestPrivacyReview, signal),
     ...createOperationServices(),
-    ...createBrowserServices(browserGoal, signal),
+    ...createBrowserServices(browserGoal, signal, chosenBrowserTask),
     createTodo: (title, dueDate) => {
       const date = dueDate ?? today()
       if (!isoDate.test(date)) throw new Error('待办日期必须使用 YYYY-MM-DD')
@@ -270,7 +272,7 @@ export function createLiveCompanionApplicationServices(
       execute: (request, confirmed) => createComputerService(useLibraryStore.getState().data.companion.computer).execute(request, confirmed),
     },
     searchWeb: async (query) => searchWeb(await protectOutboundText(query, {
-      trust: data.settings.trust,
+      trust: chosenBrowserTask?.publicSearch ? { ...data.settings.trust, outboundProtection: true } : data.settings.trust,
       destination: data.settings.webSearch.providerId === 'tencent' ? '腾讯云联网搜索' : data.settings.webSearch.providerId === 'bocha' ? '博查联网搜索' : 'Bing Search',
       purpose: '联网查询',
       requestReview: requestPrivacyReview,

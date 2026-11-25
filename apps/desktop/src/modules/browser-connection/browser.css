@@ -28,6 +28,8 @@
 .browser-connection-body .browser-cached-login,.browser-connection-body .browser-open-site{display:flex;align-items:center;gap:8px;line-height:1.7}
 .browser-cached-login input,.browser-open-site input{width:14px;height:14px;flex-shrink:0;padding:0;accent-color:var(--ink-soft)}.browser-cached-login span{color:var(--ink)}.browser-cached-login span small{display:block;color:var(--ink-soft);font-size:11px}
 .browser-site-profile{display:grid;gap:12px;min-width:0}.browser-profile-fields{display:grid;grid-template-columns:1fr 1fr;gap:10px}.browser-entry-options input{margin-top:7px}
+.browser-site-routing select,.browser-site-routing textarea{box-sizing:border-box;min-width:0;width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);font:inherit}
+.browser-site-routing textarea{resize:vertical;line-height:1.6}
 .browser-add-site{display:flex;align-items:stretch;gap:8px;min-width:0}.browser-add-site input{flex:1}.browser-add-site button{flex-shrink:0}
 .browser-sites-empty{display:flex;align-items:center;justify-content:center;gap:12px;padding:24px 12px;color:var(--ink-soft);background:var(--surface-soft);border-radius:12px}.browser-sites-empty small{display:block;font-size:11px;margin-top:4px}
 .browser-privacy-note{display:flex;align-items:flex-start;gap:8px;margin:0;color:var(--ink-soft);font-size:11px;line-height:1.8}.browser-privacy-note svg{flex-shrink:0;margin-top:3px}

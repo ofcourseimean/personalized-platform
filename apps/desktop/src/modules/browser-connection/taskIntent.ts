@@ -1,5 +1,6 @@
 import { stripCompanionAddress } from '../../domain/companionIdentity'
 import { interpretLiveStatus, isBilibiliActivityRequest } from '../../domain/liveStatusIntent'
+import { parseLiveRoomIntent } from '../companion/agent/liveRoomIntent'
 
 export type BrowserObjective = 'followed_live' | 'updates' | 'mail' | 'page'
 const action = /(?:查看|检查|看看|看一下|查查|查询|汇总|翻页|筛选|check|读取|读一下|找|获取|有没有|有新|谁|哪|网页|浏览器|(?:帮我|替我|给我).*(?:看|查|核对)|(?:看|查).*(?:订单|通知|公告|消息|邮件|邮箱)|\b(?:any|new|show|read|updates)\b)/iu
@@ -15,7 +16,7 @@ export function browserObjective(message: string, companionName?: string): Brows
   if (isBilibiliActivityRequest(message)) return 'updates'
   const live = interpretLiveStatus(message)
   if (live?.kind === 'followed') return 'followed_live'
-  if (live) return
+  if (live || parseLiveRoomIntent(message)) return
   if (/(?:邮箱|邮件|收件箱|email|mail|inbox)/iu.test(message) && action.test(message) && !/(?:发送|发一封|写一封|删除|清空)/u.test(message)) return 'mail'
   if (action.test(message) || /下载|download/iu.test(message)) return 'page'
 }

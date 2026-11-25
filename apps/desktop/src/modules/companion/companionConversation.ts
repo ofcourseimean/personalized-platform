@@ -13,6 +13,7 @@ import { localRitualTools } from './agent/ritualTools'
 import { prepareOperationTurn, finishOperationTurn, offerOperationTraining } from '../operation-memory/turn'
 import type { OperationSelection } from '../../domain/operations/types'
 import { prepareBrowserTurn, rememberBrowserTurn, forgetBrowserTurn } from '../browser-connection/taskSession'
+import { routeBrowserTurn } from '../browser-connection/semanticSiteRouting'
 import { createLiveCompanionApplicationServices } from './liveApplicationServices'
 import { armBrowserHandoff,cancelBrowserHandoff } from '../browser-connection/managed/handoff'
 import { privateConversation } from './conversationPrivacy'
@@ -56,7 +57,19 @@ export async function sendCompanionTurn(message: string, options: CompanionTurnO
   if (!privateSession && !folderFlow) new PrivacySession([]).sanitize(clean)
   const taskText = operation?.goal ?? clean
   const access = buildAgentAccess(data, temporaryCompanionWorkIds)
-  const services = createLiveCompanionApplicationServices(data, access, options.requestPrivacyReview, options.signal, taskText)
+  const registry = createCompanionToolRegistry(options.onVisualState)
+  const localAction = resolveDirectAction(taskText, registry.definitions(), data.companion.name)
+  if (!folderFlow && (!localAction || !localRitualTools.has(localAction.name))) assertExternalAiAllowed(data.companion.provider.providerId, data.settings.trust, 'companion')
+  const fullContext = applyContextPrivacy(buildAgentContext(data, access), data.settings.trust)
+  const pendingRoute = !prepared?.chosenTask && !operation && !folderFlow && !localAction
+    ? routeBrowserTurn(taskText, data, fullContext.localTime, {
+        signal: options.signal,
+        requestPrivacyReview: options.requestPrivacyReview,
+        onStart: () => options.onStatus?.({ phase: 'thinking' }),
+      })
+    : undefined
+  const chosenSite = prepared?.chosenTask ?? (pendingRoute ? await pendingRoute : undefined)
+  const services = createLiveCompanionApplicationServices(data, access, options.requestPrivacyReview, options.signal, taskText, chosenSite)
   const privateBrowserQuery = Boolean(services.browserTaskGoal) || operation?.scope === 'browser'
   const displayTransient = (role: CompanionMessage['role'], content: string) => {
     if (options.signal?.aborted) return
@@ -64,10 +77,6 @@ export async function sendCompanionTurn(message: string, options: CompanionTurnO
     options.onTransientMessage?.(item)
   }
   if (!options.resumeBrowserTask&&(operation || folderFlow || privateBrowserQuery || !data.settings.trust.retainConversationHistory)) displayTransient('user', userText)
-  const registry = createCompanionToolRegistry(options.onVisualState)
-  const localAction = resolveDirectAction(taskText, registry.definitions(), data.companion.name)
-  if (!folderFlow && (!localAction || !localRitualTools.has(localAction.name))) assertExternalAiAllowed(data.companion.provider.providerId, data.settings.trust, 'companion')
-  const fullContext = applyContextPrivacy(buildAgentContext(data, access), data.settings.trust)
   // Shared conversation never implicitly attaches local documents or memories.
   // Any actual tool use keeps the entire turn local, even in ordinary mode.
   const context = operation || privateBrowserQuery || !privateSession ? { page: operation ? 'operation-memory' : privateBrowserQuery ? 'browser-query' : 'shared-chat', companion: fullContext.companion, localTime: fullContext.localTime } : fullContext

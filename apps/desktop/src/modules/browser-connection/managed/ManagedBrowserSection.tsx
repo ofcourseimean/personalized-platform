@@ -3,6 +3,7 @@ import { Globe2,LogIn,ShieldCheck,Square,X } from 'lucide-react'
 import { useLibraryStore } from '../../../state/useLibraryStore'
 import { browserOrigin,browserPageUrl } from '../../../domain/browser'
 import { BrowserSiteProfileFields } from '../BrowserSiteProfileFields'
+import { BrowserSiteRoutingSettings } from '../BrowserSiteRoutingSettings'
 import { browserNative } from '../native'
 import { configureManagedBrowser,stopManagedBrowser,finishManagedBrowserLogin,type ManagedBrowserStatus } from './native'
 import { ConfirmDialog } from '../../../components/ConfirmDialog'
@@ -39,6 +40,7 @@ export function ManagedBrowserSection(){
       <div className="browser-connection-status"><span className="browser-status-dot online"/><span>{status?.mode==='login'?'专用登录窗口已打开':status?.mode==='recording'?'显式示范窗口已打开':'查询时在后台启动'}</span><button type="button" onClick={()=>void run(async()=>{await stopManagedBrowser();setNotice('已停止专用浏览器，本机登录会话保留。')})}><Square size={12}/>停止</button></div>
       {status?.mode==='login'&&<div className="browser-managed-login"><strong>登录完成后，回到这里继续</strong><p className="browser-note">可直接使用网站的密码登录；只有网站要求时才需额外认证。小鱼不读取登录窗口。“结束登录”后会自动续查尚未过期的当前问题，重新核对页面，不把登录当作查询成功。</p><button type="button" disabled={busy} onClick={()=>void run(async()=>{const result=await finishManagedBrowserLogin();setStatus(result.status);setNotice(result.resumed?'登录窗口已关闭，正在后台重新检查刚才的问题。':result.waiting?'登录窗口已关闭，回到原聊天界面后将自动续查；5分钟内有效。':'专用窗口已关闭。没有待续问题，之后可直接查询。')})}>结束登录 · 转为后台</button></div>}
       <BrowserRecordingCard/>
+      <BrowserSiteRoutingSettings onChooseSite={setSite}/>
       <div className="browser-sites-heading"><strong>已授权网站 <small>{sites.length}</small></strong></div>
       <div className="browser-sites">{sites.map(origin=><div className="browser-site-card" key={origin}><div className="browser-site-top"><span className="browser-site-icon"><Globe2 size={17}/></span><span className="browser-site-name"><strong>{settings?.profiles?.find(profile=>profile.origin===origin)?.label||new URL(origin).hostname}</strong><small>独立本机会话</small></span><button type="button" disabled={busy} onClick={()=>void run(()=>login(origin))}><LogIn size={13}/>登录</button><button type="button" className="browser-site-remove" aria-label={`撤销 ${origin}`} onClick={()=>useLibraryStore.getState().setCompanionBrowser({sites:sites.filter(value=>value!==origin)})}><X size={13}/></button></div><details className="browser-site-options"><summary>网站选项<small>用途、入口与操作范围</small></summary><div className="browser-site-option-body"><BrowserSiteProfileFields site={origin}/></div></details></div>)}</div>
       {!sites.length&&<div className="browser-sites-empty"><Globe2 size={22}/><span>添加常用网站<small>邮箱、通知、学习或其他网页</small></span></div>}
