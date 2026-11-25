@@ -1,8 +1,11 @@
 import type { MoodKind } from './models'
 
-// Shared by reload normalization and companion writes; new choices must survive reloads.
 export const moodKinds: MoodKind[] = [
-  'happy', 'satisfied', 'hopeful', 'grateful', 'lighthearted', 'relaxed',
-  'calm', 'disgusted', 'lost', 'uneasy', 'empty', 'tired',
-  'lonely', 'sad', 'wronged', 'anxious', 'irritated', 'angry',
+  'happy', 'satisfied', 'hopeful', 'lighthearted', 'relaxed', 'calm',
+  'bored', 'lost', 'uneasy', 'empty', 'tired', 'lonely',
+  'sad', 'sorrowful', 'wronged', 'anxious', 'irritated', 'angry',
 ]
+
+export const retiredMoodKinds = ['secure', 'grateful', 'disgusted'] as const
+const storedMoodKinds = new Set<string>([...moodKinds, ...retiredMoodKinds])
+export const isStoredMoodKind = (value: unknown): value is MoodKind => typeof value === 'string' && storedMoodKinds.has(value)

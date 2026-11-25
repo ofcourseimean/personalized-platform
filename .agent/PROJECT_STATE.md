@@ -1,6 +1,6 @@
 # Project State
 
-更新：2026-11-24。这里只保存当前事实、最近一次功能交付、待办与交接，不追加开发过程流水。
+更新：2026-11-25。这里只保存当前事实、最近一次功能交付、待办与交接，不追加开发过程流水。
 
 ## 当前阶段
 
@@ -17,6 +17,8 @@
 上方是机器源的**正式里程碑记录**：M12门禁结论仍属于2026-09-30交付快照，2026-10-19只更新了下一阶段规划，不是重新验收。当前仍为M12；M13“多端一隅与加密云中枢”已登记，未正式启动；DEC编号不是里程碑编号。
 
 ## 当前操作：DEC112 Windows 本机任务链，待真实站点和应用验收
+
+- 2026-11-25同版心情调整：用「无聊」「悲伤」替换录入的「感激」「厌恶」，保留「难过」和18项三行，旧情绪在重载、编辑与回望中保留原名称、配色、点数。桌面与手机源码共用录入表，小鱼写入清单同步。22项定向、桌面类型和目标lint、手机Web构建、文档检查通过。Windows Release/NSIS已生成，运行状态双检后桌面直接运行版已替换并核对。手机APK仍为上次候选。
 
 - 用户批准在M13.4前先做Windows。本机目录支持范围授权、设置称呼、按名称查找与重名后选择。查找在遍历时筛选，受目录/时间/结果限制，文件夹打开前复核当前授权和存在性。短期候选与刚才打开的目录仅在当前聊天会话内存保留5分钟，路径不进入模型或持久会话。
 - 专用浏览器按网站称呼与指定页面定位，沿用已授权的单次已填表单提交和手动登录续接。用户明确要求下载时，当前站点可观察附件下载分类、日期候选和实际文件回执。限制站内 HTTPS 直链、16 MiB及 PDF/DOCX/XLSX/PPTX。原生核对实际文件，后续打开文档和父目录使用同轮回执并按Windows权限逐步执行。
@@ -153,11 +155,11 @@
 
 | 产物 | 位置/核对结果 |
 |---|---|
-| Windows候选 EXE | 项目 `apps/desktop/src-tauri/target/release/yiyu.exe` 和 Windows 镜像一致；本次运行保护中止桌面替换 |
-| 候选EXE SHA-256 | `ff692663f86e14696ba08618f9a1792a4097fcc089097df2960bd0dcdca17fc2` |
-| 桌面EXE SHA-256 | `c9dc8e951aaa8f93294ca7f12c2e18c20ec25dd45114dfbb7c439954d952768b`，仍为前一修补版 |
+| Windows候选 EXE | 项目 `apps/desktop/src-tauri/target/release/yiyu.exe`、Windows镜像与桌面直接运行版一致；2026-11-25心情修补 |
+| 候选EXE SHA-256 | `06b5d469d5dba1c6450805d69baec305202c8a7c02ca1457dae6e0c7573f14c2` |
+| 桌面EXE SHA-256 | `06b5d469d5dba1c6450805d69baec305202c8a7c02ca1457dae6e0c7573f14c2`，桌面替换已通过双检 |
 | NSIS | `apps/desktop/src-tauri/target/release/bundle/nsis/一隅_2.0.0_x64-setup.exe`，只在target，不放桌面 |
-| NSIS SHA-256 | `ee7cc118c4250eacbf68786343b5299f8b06fefbe94b9349381f4293f1e586f3` |
+| NSIS SHA-256 | `704c0822d6974b4e57fac749e32e432eb2c881beb6ad7d8d55362cf88c0abd56` |
 | Android 调试预览 | `apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk`，0.7.0-preview，3,951,645字节（约3.8MiB），下载目录同份，不进Git |
 | APK SHA-256 | `19293d6dd56965553beb798a2284b8b8e5297c901cf7afeb62273072116ea410` |
 

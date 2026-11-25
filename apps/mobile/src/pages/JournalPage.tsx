@@ -3,7 +3,7 @@ import { ArrowUpRight, Feather, Sparkles } from 'lucide-react'
 import type { Records } from '@yiyu/sync'
 import { today, text } from '../data'
 import { RecordForm } from '../components/RecordForm'
-import { moodOptions } from '../../../desktop/src/modules/mood/moodConfig'
+import { moodCatalog } from '../../../desktop/src/modules/mood/moodConfig'
 export function JournalPage({
   records,
   go,
@@ -71,7 +71,7 @@ export function JournalPage({
                   .filter(([, points]) => points > 0)
                   .map(([id, points]) => (
                     <span key={id}>
-                      {moodOptions.find((mood) => mood.id === id)?.label ?? id} {points}
+                      {moodCatalog.find((mood) => mood.id === id)?.label ?? id} {points}
                     </span>
                   ))}
               </div>
