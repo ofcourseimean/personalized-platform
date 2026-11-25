@@ -120,7 +120,7 @@ export async function sendCompanionTurn(message: string, options: CompanionTurnO
         requestReview: options.requestPrivacyReview,
         assertAllowed: assertBrowserAllowed,
         authorizeSanitizedQuery: authorizeBrowserSend,
-        reviewEachRequest: Boolean(assertBrowserAllowed),
+        reviewEachRequest: Boolean(assertBrowserAllowed && data.companion.browser?.confirmQueryEgress),
       }),
       registry,
       permissions,

@@ -1,4 +1,5 @@
 import { PrivacySession } from '../../desktop/src/modules/privacy/privacySession'
+import { findingsRequiringConfirmation } from '../../desktop/src/modules/privacy/reviewPolicy'
 import './native'
 export async function requestModel(
   material: string,
@@ -15,10 +16,11 @@ export async function requestModel(
     throw new Error('请安装本次更新的安卓版，并在手机设置中配置模型密钥。')
   const privacy = new PrivacySession([]),
     clean = privacy.sanitize(material)
-  if (clean.findings.length && document.hidden)
+  const needsReview = findingsRequiringConfirmation(clean.findings).length > 0
+  if (needsReview && document.hidden)
     throw new Error('这轮需要隐私确认，请回一隅后再发送；没有向模型发送。')
   if (
-    clean.findings.length &&
+    needsReview &&
     !confirm(`将把已脱敏的文字发送给 DeepSeek：\n\n${clean.text.slice(0, 600)}\n\n是否继续？`)
   )
     throw new Error('已取消，内容没有发送。')

@@ -23,9 +23,9 @@ describe('private browser egress has live send boundaries',()=>{
     const protectedProvider=createPrivacyProtectedProvider(f.provider,{trust:f.trust,destination:'fixture',purpose:'test',assertAllowed:()=>{if(!valid)throw new Error('已撤销')}})
     await expect(protectedProvider.generate(request)).rejects.toThrow('已撤销')
   })
-  it('does not bypass later private-source review because an earlier prompt was reviewed',async()=>{
+  it('honors explicit browser review on each send even in balanced mode',async()=>{
     const f=fixture(),review=vi.fn(async()=>true)
-    const protectedProvider=createPrivacyProtectedProvider(f.provider,{trust:f.trust,destination:'fixture',purpose:'test',requestReview:review,reviewEachRequest:true})
+    const protectedProvider=createPrivacyProtectedProvider(f.provider,{trust:{...f.trust,outboundReviewMode:'balanced'},destination:'fixture',purpose:'test',requestReview:review,reviewEachRequest:true})
     await protectedProvider.generate(request);await protectedProvider.generate({...request,messages:[...request.messages,{role:'tool',content:'另一条虚构私密来源'}]})
     expect(review).toHaveBeenCalledTimes(2)
   })
