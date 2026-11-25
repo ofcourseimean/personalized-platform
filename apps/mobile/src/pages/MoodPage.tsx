@@ -30,12 +30,14 @@ export default function MoodPage({
     [period, setPeriod] = useState<MoodPeriod>((match?.[2] as MoodPeriod) ?? currentMoodPeriod())
   const [points, setPoints] = useState<MoodPoints>({}),
     [range, setRange] = useState<'week' | 'month'>('week'),
-    [reference, setReference] = useState(match?.[1] ?? today())
+    [reference, setReference] = useState(match?.[1] ?? today()),
+    [reflectionDate, setReflectionDate] = useState(match?.[1] ?? today())
   const [saving, setSaving] = useState(false)
   const total = Object.values(points).reduce((sum, value) => sum + (value ?? 0), 0),
     entries = rows<MoodEntry>(records, 'moods')
   const dates = datesFor(reference, range),
-    dayEntries = entries.filter((item) => item.date === date)
+    activeDate = dates.includes(reflectionDate) ? reflectionDate : reference,
+    dayEntries = entries.filter((item) => item.date === activeDate)
   return (
     <section className="mood-page">
       <p className="eyebrow">不急着解释，只给感受一点位置</p>
@@ -158,12 +160,12 @@ export default function MoodPage({
       <ReflectionVisualizations
         dates={dates}
         entries={entries}
-        activeDate={date}
-        onChooseDate={setDate}
+        activeDate={activeDate}
+        onChooseDate={setReflectionDate}
       >
         <div className="mood-ribbons">
           {dates.map((day) => (
-            <button key={day} aria-pressed={day === date} onClick={() => setDate(day)}>
+            <button key={day} aria-pressed={day === activeDate} onClick={() => setReflectionDate(day)}>
               <time>{day.slice(5)}</time>
               {moodPeriods.map((period) => {
                 const item = entries.find(
@@ -180,7 +182,7 @@ export default function MoodPage({
         </div>
       </ReflectionVisualizations>
       <section className="paper-card">
-        <h3>{date} 的原始记录</h3>
+        <h3>{activeDate} 的原始记录</h3>
         {dayEntries.length ? (
           dayEntries.map((entry) => (
             <div className="mood-detail" key={entry.id}>

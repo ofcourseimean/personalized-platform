@@ -107,7 +107,7 @@ function MoodReflection({ entries, referenceDate }: { entries: MoodEntry[]; refe
           <button type="button" disabled={isCurrent} onClick={() => chooseAnchor(today)}>回到{range === 'week' ? '本周' : '本月'}</button>
         </nav>
 
-        <ReflectionVisualizations dates={stats.dates} entries={stats.selected} activeDate={activeDate} onChooseDate={chooseDate}>
+        <ReflectionVisualizations dates={stats.dates} entries={entries} activeDate={activeDate} onChooseDate={chooseDate}>
         {stats.selected.length ? <>
           <section className="mood-overall-tone" aria-label={`${rangeLabel}情绪底色`}>
             <div><span>{rangeLabel}情绪底色</span><small>{moodSummary(stats.totals)}</small></div>

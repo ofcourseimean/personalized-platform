@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import type { MoodEntry } from '../../domain/models'
 import { createSeedLibrary } from '../../domain/seed'
 import { useLibraryStore } from '../../state/useLibraryStore'
@@ -82,5 +82,26 @@ describe('historical mood reflection', () => {
     expect(container.querySelector('details')).toHaveAttribute('open')
     expect(screen.getByLabelText('选择回望月份')).toHaveValue('2024-02')
     expect(screen.getByText('闰年旧记录')).toBeInTheDocument()
+  })
+
+  it('shares the selected trend date with its raw records and can hide the moving average', () => {
+    openReflection()
+    fireEvent.click(screen.getByRole('button', { name: '上个月' }))
+    const trend = within(screen.getByRole('region', { name: '心情走向' }))
+    expect(trend.getByText('未记录')).toBeInTheDocument()
+    expect(trend.queryByRole('button', { name: /2026-09-14/ })).not.toBeInTheDocument()
+
+    const day = trend.getByRole('button', { name: '2026-09-15 心情走向 89 分，已记 1/3 时段' })
+    fireEvent.click(day)
+    expect(day).toHaveAttribute('aria-pressed', 'true')
+    expect(trend.getByText('89 分')).toBeInTheDocument()
+    expect(trend.getByText('近 7 日均值 89 · 1 天有记录')).toBeInTheDocument()
+    expect(screen.getByText('上个月的心情')).toBeInTheDocument()
+
+    fireEvent.click(trend.getByRole('button', { name: '7 日均线' }))
+    expect(trend.queryByText(/近 7 日均值/)).not.toBeInTheDocument()
+    expect(trend.getByText('89 分')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '气泡矩阵' }))
+    expect(trend.getByText('89 分')).toBeInTheDocument()
   })
 })

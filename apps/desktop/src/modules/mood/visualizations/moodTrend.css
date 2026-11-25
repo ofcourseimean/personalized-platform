@@ -1,0 +1,107 @@
+.mood-trend {
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  color: var(--ink-soft, var(--muted));
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.mood-trend > header,
+.mood-trend-readout {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 5px 10px;
+}
+
+.mood-trend > header { justify-content: space-between; }
+.mood-trend h3 { margin: 0; color: var(--ink, var(--accent)); font: 500 14px var(--serif, serif); }
+
+.mood-trend .mood-trend-average-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  font-size: 11px;
+}
+
+.mood-trend-average-toggle::before {
+  width: 12px;
+  border-top: 1px dashed currentColor;
+  content: '';
+}
+
+.mood-trend-readout { font-size: 11px; font-variant-numeric: tabular-nums; }
+.mood-trend-readout strong { color: var(--ink, var(--accent)); font-size: 15px; }
+.mood-trend-readout small { font-size: inherit; }
+
+.mood-trend-chart {
+  --mood-trend-height: 110px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+}
+
+.mood-trend-scale {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: end;
+  box-sizing: content-box;
+  height: calc(var(--mood-trend-height) + 10px);
+  font-size: 10px;
+  line-height: 10px;
+}
+
+.mood-trend-scroll { min-width: 0; overflow-x: auto; scrollbar-width: thin; }
+.mood-trend-track { min-width: calc(var(--mood-trend-days) * 24px); padding: 5px 0 1px; }
+
+.mood-trend-plot {
+  position: relative;
+  height: var(--mood-trend-height);
+  border-radius: 5px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 6%, transparent), transparent);
+}
+
+.mood-trend-plot > svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.mood-trend-plot line { stroke: var(--line); }
+.mood-trend-plot line.baseline { stroke-dasharray: 2 4; }
+.mood-trend-plot path { fill: none; stroke-linejoin: round; stroke-linecap: round; }
+.mood-trend-score-path { stroke: var(--accent); stroke-width: 1.8; }
+.mood-trend-average-path { stroke: var(--ink-soft, var(--muted)); stroke-width: 1.15; stroke-dasharray: 3 4; }
+
+.mood-trend-columns,
+.mood-trend-dates {
+  display: grid;
+  grid-template-columns: repeat(var(--mood-trend-days), minmax(0, 1fr));
+}
+
+.mood-trend-columns { position: absolute; inset: 0; }
+
+.mood-trend .mood-trend-columns > button {
+  position: relative;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+}
+
+.mood-trend .mood-trend-columns > button:is(:hover, [aria-pressed='true']) {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.mood-trend .mood-trend-columns > button:focus-visible { outline-offset: -2px; }
+.mood-trend-columns i { position: absolute; left: 50%; transform: translate(-50%, -50%); border-radius: 50%; }
+.mood-trend-score-dot { width: 8px; height: 8px; border: 1.5px solid var(--accent); background: var(--surface); }
+.mood-trend-score-dot[data-complete='true'] { background: var(--accent); }
+.mood-trend-average-dot { width: 4px; height: 4px; background: var(--ink-soft, var(--muted)); }
+
+.mood-trend-dates { padding-top: 5px; text-align: center; font-size: 10px; font-variant-numeric: tabular-nums; }
+.mood-trend-dates .selected { color: var(--accent-strong, var(--accent)); font-weight: 600; }

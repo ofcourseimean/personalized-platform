@@ -18,6 +18,7 @@
 
 ## 当前操作：DEC112 Windows 本机任务链，待真实站点和应用验收
 
+- 2026-11-25同版心情回望新增「心情走向」：桌面和移动源码共用中文词汇愉悦度权重，按已记时段计算 0–100 日分、可切换的 7 日均线与当日记录覆盖。旧情绪直接参与计算，缺记日留空，已有五点分配和原始记录结构均可沿用。手机回望日期与录入日期独立。41 项定向、桌面及移动 Web 构建、桌面折叠回望和移动 320／1280 宽度的隔离浏览器交互通过。Windows Release/NSIS 已生成，桌面直接运行版通过双检替换并核对。Android APK 仍为上次候选。
 - 2026-11-25同版心情调整：用「无聊」「悲伤」替换录入的「感激」「厌恶」，保留「难过」和18项三行，旧情绪在重载、编辑与回望中保留原名称、配色、点数。桌面与手机源码共用录入表，小鱼写入清单同步。22项定向、桌面类型和目标lint、手机Web构建、文档检查通过。Windows Release/NSIS已生成，运行状态双检后桌面直接运行版已替换并核对。手机APK仍为上次候选。
 
 - 用户批准在M13.4前先做Windows。本机目录支持范围授权、设置称呼、按名称查找与重名后选择。查找在遍历时筛选，受目录/时间/结果限制，文件夹打开前复核当前授权和存在性。短期候选与刚才打开的目录仅在当前聊天会话内存保留5分钟，路径不进入模型或持久会话。
@@ -155,11 +156,11 @@
 
 | 产物 | 位置/核对结果 |
 |---|---|
-| Windows候选 EXE | 项目 `apps/desktop/src-tauri/target/release/yiyu.exe`、Windows镜像与桌面直接运行版一致；2026-11-25心情修补 |
-| 候选EXE SHA-256 | `06b5d469d5dba1c6450805d69baec305202c8a7c02ca1457dae6e0c7573f14c2` |
-| 桌面EXE SHA-256 | `06b5d469d5dba1c6450805d69baec305202c8a7c02ca1457dae6e0c7573f14c2`，桌面替换已通过双检 |
+| Windows候选 EXE | 项目 `apps/desktop/src-tauri/target/release/yiyu.exe`、Windows镜像与桌面直接运行版一致（2026-11-25 心情走向） |
+| 候选EXE SHA-256 | `a4e5bf56a231bef1e5e120529f57e0e6c1fe810afd9964c6e6fef641f1d4efba` |
+| 桌面EXE SHA-256 | `a4e5bf56a231bef1e5e120529f57e0e6c1fe810afd9964c6e6fef641f1d4efba`，桌面替换已通过双检 |
 | NSIS | `apps/desktop/src-tauri/target/release/bundle/nsis/一隅_2.0.0_x64-setup.exe`，只在target，不放桌面 |
-| NSIS SHA-256 | `704c0822d6974b4e57fac749e32e432eb2c881beb6ad7d8d55362cf88c0abd56` |
+| NSIS SHA-256 | `1315b468dbd5821190cdef2c12ea9c69ac05d4d67d2b5708dade1bc31272818d` |
 | Android 调试预览 | `apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk`，0.7.0-preview，3,951,645字节（约3.8MiB），下载目录同份，不进Git |
 | APK SHA-256 | `19293d6dd56965553beb798a2284b8b8e5297c901cf7afeb62273072116ea410` |
 

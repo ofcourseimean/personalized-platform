@@ -2,6 +2,8 @@ import { useMemo, useState, type ReactNode } from 'react'
 import type { MoodEntry } from '../../../domain/models'
 import { moodCatalog } from '../moodConfig'
 import { BubbleMatrix } from './BubbleMatrix'
+import { MoodTrendChart } from './MoodTrendChart'
+import { moodTrend } from './moodTrend'
 import { dayLabel, emotionDistribution, reflectionDays, shortDate } from './reflectionData'
 import './reflectionVisualizations.css'
 
@@ -29,6 +31,7 @@ interface Props {
 export function ReflectionVisualizations({ dates, entries, activeDate, onChooseDate, children }: Props) {
   const [view, setView] = useState<ReflectionView>(initialView)
   const days = useMemo(() => reflectionDays(dates, entries), [dates, entries])
+  const trend = useMemo(() => moodTrend(dates, entries), [dates, entries])
   const chooseView = (next: ReflectionView) => {
     setView(next)
     try { localStorage.setItem(reflectionViewKey, next) } catch { /* A view preference is optional. */ }
@@ -37,6 +40,7 @@ export function ReflectionVisualizations({ dates, entries, activeDate, onChooseD
   const emotions = emotionDistribution(days)
   const absent = emotions.filter((mood) => !mood.points)
   return <section className="mood-visualization-lab" aria-label="情绪回望可视化">
+    <MoodTrendChart days={trend} activeDate={activeDate} onChooseDate={onChooseDate} />
     <header className="mood-viz-heading"><span>回望视图</span></header>
     <div className="mood-viz-switch" role="group" aria-label="选择情绪可视化">{reflectionViews.map((option) => <button type="button" key={option.id} aria-pressed={view === option.id} onClick={() => chooseView(option.id)}>{option.label}</button>)}</div>
     <div className="mood-viz-introduction"><p>{reflectionViews.find((option) => option.id === view)!.hint}</p></div>
