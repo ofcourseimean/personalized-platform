@@ -1,20 +1,17 @@
 import { useEffect,useState } from 'react'
-import { Globe2,LogIn,ShieldCheck,Square,X } from 'lucide-react'
+import { ShieldCheck,Square } from 'lucide-react'
 import { useLibraryStore } from '../../../state/useLibraryStore'
-import { bilibiliCreatorSites,browserOrigin,browserPageUrl } from '../../../domain/browser'
-import { BrowserSiteProfileFields } from '../BrowserSiteProfileFields'
-import { BrowserSiteRoutingSettings } from '../BrowserSiteRoutingSettings'
 import { browserNative } from '../native'
 import { configureManagedBrowser,stopManagedBrowser,finishManagedBrowserLogin,type ManagedBrowserStatus } from './native'
 import { ConfirmDialog } from '../../../components/ConfirmDialog'
-import { websiteRole } from '../siteProfile'
 import { BrowserRecordingCard } from '../recording/BrowserRecordingCard'
+import { BrowserSmartRouting } from '../BrowserSiteRoutingSettings'
+import { ManagedBrowserSites } from './ManagedBrowserSites'
 
 export function ManagedBrowserSection(){
   const settings=useLibraryStore(state=>state.data.companion.browser)
-  const [status,setStatus]=useState<ManagedBrowserStatus>(),[site,setSite]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState('')
-  const enabled=settings?.enabled===true,sites=settings?.sites??[]
-  const creatorEnabled=bilibiliCreatorSites.every(origin=>sites.includes(origin))
+  const [status,setStatus]=useState<ManagedBrowserStatus>(),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState('')
+  const enabled=settings?.enabled===true
   const [clearSession,setClearSession]=useState(false)
   useEffect(()=>{
     if(!('__TAURI_INTERNALS__' in window))return
@@ -28,38 +25,33 @@ export function ManagedBrowserSection(){
     await browserNative('managed_browser_login',{origin,url:entry,expectedEpoch:state.epoch});setStatus({...state,mode:'login'})
     setNotice('请在专用窗口直接使用网站密码登录；只有网站要求时才需额外认证。完成后点“结束登录”，自动续查当前未过期问题。日常Edge登录不会自动继承。')
   }
-  const add=()=>{
-    const raw=/^https:\/\//u.test(site.trim())?site.trim():`https://${site.trim()}`,url=new URL(raw),origin=browserOrigin(url.origin),entry=browserPageUrl(url.href,origin)
-    const current=useLibraryStore.getState().data.companion.browser
-    const previous=current?.profiles?.find(profile=>profile.origin===origin)
-    useLibraryStore.getState().setCompanionBrowser({sites:[...new Set([...(current?.sites??[]),origin])],interactionSites:[...new Set([...(current?.interactionSites??[]),origin])],profiles:[...(current?.profiles??[]).filter(profile=>profile.origin!==origin),{...previous,origin,role:websiteRole(origin,previous),entryUrl:entry}]})
-    setSite('');setNotice('网站已添加。需要账号的网站先点“登录”；公开网站可直接查询。')
-  }
-  return <details className="permission-scope-group browser-connection" open><summary><span>小鱼专用浏览器</span><small>{!enabled?'未开启':status?.mode==='login'?'正在登录':status?.mode==='recording'?'正在示范':'无窗口查询'}</small></summary><div className="browser-connection-body">
-    <div className="setting-row"><div><strong>安静地浏览与查询</strong><span>使用独立登录，不打扰日常Edge；无需安装扩展。</span></div><button type="button" className={enabled?'switch on':'switch'} aria-label="启用小鱼专用浏览器" aria-pressed={enabled} onClick={()=>useLibraryStore.getState().setCompanionBrowser({enabled:!enabled})}><i/></button></div>
-    {enabled&&<>
-      <div className="browser-connection-status"><span className="browser-status-dot online"/><span>{status?.mode==='login'?'专用登录窗口已打开':status?.mode==='recording'?'显式示范窗口已打开':'查询时在后台启动'}</span><button type="button" onClick={()=>void run(async()=>{await stopManagedBrowser();setNotice('已停止专用浏览器，本机登录会话保留。')})}><Square size={12}/>停止</button></div>
+  const visibleSession = status?.mode === 'login' || status?.mode === 'recording'
+  const stop = () => void run(async () => {
+    await stopManagedBrowser()
+    setStatus(undefined)
+    setNotice('已停止专用浏览器，本机登录会话保留。')
+  })
+  return <div className="browser-connection-body browser-direct">
+    <div className="setting-row"><div><strong>允许小鱼浏览网站</strong><span>可在下面添加小鱼能访问的网站。</span></div><button type="button" className={enabled?'switch on':'switch'} aria-label="启用小鱼专用浏览器" aria-pressed={enabled} onClick={()=>useLibraryStore.getState().setCompanionBrowser({enabled:!enabled})}><i/></button></div>
+    {settings && enabled && <>
+      {visibleSession && <div className="browser-connection-status"><span className="browser-status-dot online"/><span>{status?.mode === 'login' ? '专用登录窗口已打开' : '正在记录操作示范'}</span><button type="button" disabled={busy} onClick={stop}><Square size={12} />停止</button></div>}
       {status?.mode==='login'&&<div className="browser-managed-login"><strong>登录完成后，回到这里继续</strong><p className="browser-note">可直接使用网站的密码登录；只有网站要求时才需额外认证。小鱼不读取登录窗口。“结束登录”后会自动续查尚未过期的当前问题，重新核对页面，不把登录当作查询成功。</p><button type="button" disabled={busy} onClick={()=>void run(async()=>{const result=await finishManagedBrowserLogin();setStatus(result.status);setNotice(result.resumed?'登录窗口已关闭，正在后台重新检查刚才的问题。':result.waiting?'登录窗口已关闭，回到原聊天界面后将自动续查；5分钟内有效。':'专用窗口已关闭。没有待续问题，之后可直接查询。')})}>结束登录 · 转为后台</button></div>}
-      <BrowserRecordingCard/>
-      <BrowserSiteRoutingSettings onChooseSite={setSite}/>
-      <details className="browser-site-options">
-        <summary>B 站创作者动态<small>{creatorEnabled?'已授权':'可授权'}</small></summary>
-        <div className="browser-site-option-body">
-          <p className="browser-note">专用浏览器会在 B 站搜索对应账号，再读取个人空间的可见动态。</p>
-          {!creatorEnabled&&<button type="button" disabled={busy} onClick={()=>void run(async()=>{
-            const current=useLibraryStore.getState().data.companion.browser?.sites??[]
-            useLibraryStore.getState().setCompanionBrowser({sites:[...new Set([...current,...bilibiliCreatorSites])]})
-          })}>授权用户搜索和个人空间</button>}
+      <ManagedBrowserSites settings={settings} busy={busy} run={run} login={login} notify={setNotice} />
+      <BrowserRecordingCard />
+      <details className="browser-install-options browser-advanced">
+        <summary>选站与隐私</summary>
+        <div className="browser-install-body">
+          <BrowserSmartRouting />
+          <label className="browser-cached-login"><input type="checkbox" checked={settings.confirmQueryEgress === true} onChange={event => useLibraryStore.getState().setCompanionBrowser({ confirmQueryEgress: event.target.checked })} /><span>每次发送脱敏结果前确认</span></label>
+          <p className="browser-privacy-note"><ShieldCheck size={14} /><span>登录会话保存在本机。普通查询只向模型提供必要的控件语义；私人正文节选需要单独确认。</span></p>
+          <div className="browser-actions">
+            {!visibleSession && <button type="button" disabled={busy} onClick={stop}><Square size={12} />停止浏览器</button>}
+            <button type="button" disabled={busy} onClick={() => setClearSession(true)}>清除专用浏览器登录</button>
+          </div>
         </div>
       </details>
-      <div className="browser-sites-heading"><strong>已授权网站 <small>{sites.length}</small></strong></div>
-      <div className="browser-sites">{sites.map(origin=><div className="browser-site-card" key={origin}><div className="browser-site-top"><span className="browser-site-icon"><Globe2 size={17}/></span><span className="browser-site-name"><strong>{settings?.profiles?.find(profile=>profile.origin===origin)?.label||new URL(origin).hostname}</strong><small>独立本机会话</small></span><button type="button" disabled={busy} onClick={()=>void run(()=>login(origin))}><LogIn size={13}/>登录</button><button type="button" className="browser-site-remove" aria-label={`撤销 ${origin}`} onClick={()=>useLibraryStore.getState().setCompanionBrowser({sites:sites.filter(value=>value!==origin)})}><X size={13}/></button></div><details className="browser-site-options"><summary>网站选项<small>用途、入口与操作范围</small></summary><div className="browser-site-option-body"><BrowserSiteProfileFields site={origin}/></div></details></div>)}</div>
-      {!sites.length&&<div className="browser-sites-empty"><Globe2 size={22}/><span>添加常用网站<small>邮箱、通知、学习或其他网页</small></span></div>}
-      <form className="browser-add-site" onSubmit={event=>{event.preventDefault();void run(async()=>add())}}><input aria-label="专用浏览器授权网站" value={site} onChange={event=>setSite(event.target.value)} placeholder="网站域名或HTTPS入口链接" autoComplete="off"/><button type="submit" disabled={busy||!site.trim()}>添加并授权浏览</button></form>
-      <p className="browser-privacy-note"><ShieldCheck size={14}/><span>登录会话只保存在本机，不进资料备份，不导出密码或Cookie。DeepSeek等模型通常只接收控件语义和必要统计；正文、私人标题与账号路径不用于普通规划。明确要求理解正文时，最多提供2000字节选并单独审查发送。最小信息仍会外发，不能保证自动脱敏识别所有隐私。发送、删除、支付不属于普通浏览。</span></p>
-      <details className="browser-site-options"><summary>隐私与本机会话<small>仅专用浏览器</small></summary><label className="browser-cached-login"><input type="checkbox" checked={settings?.confirmQueryEgress===true} onChange={event=>useLibraryStore.getState().setCompanionBrowser({confirmQueryEgress:event.target.checked})}/><span>每次发送脱敏结果前确认<small>默认不重复询问已授权网站的明确查询</small></span></label><p className="browser-note">停用或移除网站会立即停止相关访问，但不会自动抹掉登录。清除会退出专用浏览器的所有账号，不影响日常Edge。</p><button type="button" disabled={busy} onClick={()=>setClearSession(true)}>清除专用浏览器登录</button></details>
     </>}
     {notice&&<p className="browser-note" role="status">{notice}</p>}{error&&<p className="browser-note" role="alert">{error}</p>}
     {clearSession&&<ConfirmDialog title="清除专用浏览器登录？" subject="小鱼的独立本机会话" description="将停止专用浏览器并清除其中所有网站的登录、缓存与本机网页数据，无法恢复。已授权网站列表、日常Edge和资料库不会删除。" confirmLabel="确认清除" permanent onCancel={()=>setClearSession(false)} onConfirm={()=>void run(async()=>{await browserNative('managed_browser_clear_session',{confirmed:true});setClearSession(false);setStatus(undefined);setNotice('专用浏览器登录已清除，无法恢复。已授权网站保留，之后可重新登录。')})}/>}
-  </div></details>
+  </div>
 }

@@ -4,13 +4,14 @@ import { useLibraryStore } from '../../state/useLibraryStore'
 import { OperationMemoryEntry } from '../operation-memory/OperationMemoryPanel'
 
 export function CompanionGrowthSection() {
-  const { data, addCompanionMemory, updateCompanionMemory, deleteCompanionMemory, setCompanionGrowthEnabled, setCompanionPersonality, rollbackCompanionGrowth, resetCompanionPersonality } = useLibraryStore()
+  const { data, setCompanionProfile, addCompanionMemory, updateCompanionMemory, deleteCompanionMemory, setCompanionGrowthEnabled, setCompanionPersonality, rollbackCompanionGrowth, resetCompanionPersonality } = useLibraryStore()
   const companion = data.companion
   const [memoryDraft, setMemoryDraft] = useState('')
   const exportMemories = () => { const blob = new Blob([JSON.stringify(companion.memories, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = '一隅-伙伴记忆.json'; link.click(); URL.revokeObjectURL(url) }
 
   return <section className="settings-section companion-growth-section">
-    <div className="settings-title"><Sparkles /><div><h2>记忆与性格</h2><p>记忆由你决定，变化可以查看或撤销。</p></div></div>
+    <div className="settings-title"><Sparkles /><div><h3>对话偏好</h3><p>记忆由你决定，变化可以查看或撤销。</p></div></div>
+      <label className="setting-row"><div><strong>回应气质</strong><span>影响伙伴状态文字</span></div><select value={companion.expression} onChange={(event) => setCompanionProfile({ expression: event.target.value as typeof companion.expression })}><option value="calm">安静</option><option value="warm">温暖</option><option value="thinking">思考</option></select></label>
     <div className="settings-subsection"><div className="settings-subsection-heading"><strong>操作记忆</strong><small>记住方法，不记住权限或历史结果；支持参数与现场核对</small></div><OperationMemoryEntry /></div>
     <div className="settings-subsection"><div className="settings-subsection-heading"><strong>可治理记忆</strong><small>只有启用的记忆才会注入对话；删除立即生效</small></div>
       <div className="memory-compose"><input aria-label="新增伙伴记忆" value={memoryDraft} onChange={(event) => setMemoryDraft(event.target.value)} placeholder="例如：我更喜欢安静的提醒" /><button className="ghost-button" onClick={() => { if (addCompanionMemory(memoryDraft, 'manual', '用户手动添加')) setMemoryDraft('') }}>添加</button><button className="ghost-button" disabled={!companion.memories.length} onClick={exportMemories}><Download size={13} />导出</button></div>

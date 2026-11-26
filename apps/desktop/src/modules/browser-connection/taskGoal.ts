@@ -74,9 +74,9 @@ export function resolveBrowserTask(message: string, companion: CompanionData): B
   if (creator) {
     const candidates = creator.uid ? [bilibiliCreatorSites[1]] : [...bilibiliCreatorSites]
     const clarification = browser?.backend !== 'managed'
-      ? '查询创作者最新动态需要小鱼专用浏览器。请在「浏览器工作方式」里启用，并启用「B 站创作者动态」。'
+      ? '查询创作者最新动态需要小鱼专用浏览器。请在「设置 → 网页与电脑」切换到小鱼专用浏览器，并在常用网站添加 B 站。'
       : candidates.some(origin => !sites.includes(origin))
-        ? '请在「小鱼专用浏览器」里启用「B 站创作者动态」。一次授权会启用 B 站的用户搜索和个人空间。'
+        ? '请在「设置 → 网页与电脑 → 常用网站」添加或补齐 B 站，一次即可授权用户搜索和个人空间。'
         : undefined
     return { objective: 'page', creator, candidates, origins: clarification ? [] : candidates, ...(clarification ? { clarification } : {}) }
   }

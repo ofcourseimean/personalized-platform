@@ -81,8 +81,7 @@ export function ComputerCapabilitySettings() {
     }
   }
 
-  return <details className="permission-scope-group computer-capability-settings">
-    <summary><span>电脑能力</span><small>{settings.enabled ? `已开启 · ${settings.grants.length} 条规则` : '未开启'}</small></summary>
+  return <section className="settings-section computer-capability-settings">
     <div className="computer-capability-body">
       <div className="permission-list computer-permission-list">
         <div>
@@ -133,5 +132,5 @@ export function ComputerCapabilitySettings() {
       </>}
       <p className="computer-status"><ShieldAlert size={13} />{message}</p>
     </div>
-  </details>
+  </section>
 }

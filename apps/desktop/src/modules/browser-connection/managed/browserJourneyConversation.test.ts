@@ -41,7 +41,7 @@ it('sends the exact screenshot request to the native browser and renders the ver
 
 it('stops with the targeted authorization text rather than substituting public search', async () => {
   useLibraryStore.getState().setCompanionBrowser({ sites: ['https://www.bilibili.com', bilibiliCreatorSites[0]] })
-  expect(await sendCompanionTurn('天才美少女卡莎最新一条动态是啥')).toContain('B 站创作者动态')
+  expect(await sendCompanionTurn('天才美少女卡莎最新一条动态是啥')).toContain('添加或补齐 B 站')
   expect(calls.native).not.toHaveBeenCalled()
   expect(calls.generate).not.toHaveBeenCalled()
 })

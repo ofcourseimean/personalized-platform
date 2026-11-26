@@ -105,8 +105,7 @@ export function CompanionVoiceSettings() {
     }
   }
 
-  return <details className="voice-settings">
-    <summary><span><Volume2 size={15} /><span><strong>语音交互</strong><small>{provider === 'elevenlabs' ? 'ElevenLabs · 识别与朗读' : provider === 'none' ? '未启用' : '预留其他 Provider'}</small></span></span><b>{voice.autoSpeak ? '自动朗读' : '按需使用'}</b></summary>
+  return <section className="settings-section voice-settings settings-voice-page">
     <div className="voice-settings-body">
       <label className="setting-row"><div><strong>语音服务</strong><span>同一入口管理语音识别和语音合成</span></div><select value={provider} onChange={(event) => chooseProvider(event.target.value as VoiceProvider)}><option value="none">关闭</option><option value="elevenlabs">ElevenLabs</option><option value="custom">其他 Provider（预留）</option></select></label>
       {provider === 'elevenlabs' && <>
@@ -147,5 +146,5 @@ export function CompanionVoiceSettings() {
       {provider === 'custom' && <p className="voice-provider-note">语音层已按 Provider 接口拆分；接入其他项目时只需增加适配器，无需修改伙伴窗口和对话流程。</p>}
       <p className="voice-provider-note">{message}</p>
     </div>
-  </details>
+  </section>
 }

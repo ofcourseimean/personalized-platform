@@ -1,6 +1,7 @@
 import { Check, Palette, Puzzle } from 'lucide-react'
 import type { ThemeId } from '../../domain/models'
 import { useLibraryStore } from '../../state/useLibraryStore'
+import { SettingsDetail } from './SettingsDetail'
 import { BackgroundSettingsSection } from './BackgroundSettingsSection'
 
 const themes: { id: ThemeId; name: string; description: string }[] = [
@@ -11,12 +12,11 @@ const themes: { id: ThemeId; name: string; description: string }[] = [
 
 export function AppearanceSettings() {
   const { data, setTheme, toggleRightPanel, setDailyTarget, setLayoutProfile, setMusicSettings } = useLibraryStore()
-  return <>      <section className="settings-section">
+  return <>
+      <section className="settings-section">
         <div className="settings-title"><Palette /><div><h2>外观与主题</h2><p>界面主题与导出文稿样式彼此独立。</p></div></div>
         <div className="theme-grid">{themes.map((theme) => <button className={data.settings.theme === theme.id ? 'theme-choice active' : 'theme-choice'} key={theme.id} onClick={() => setTheme(theme.id)}><span className={`theme-preview ${theme.id}`}><i /><i /><i /></span><strong>{theme.name}</strong><small>{theme.description}</small>{data.settings.theme === theme.id && <b><Check size={13} /></b>}</button>)}</div>
       </section>
-
-      <BackgroundSettingsSection />
 
       <section className="settings-section">
         <div className="settings-title"><Puzzle /><div><h2>布局与写作</h2><p>保留真正需要的信息。</p></div></div>
@@ -26,5 +26,6 @@ export function AppearanceSettings() {
         <label className="setting-row"><div><strong>每日字数目标</strong><span>仅展示进度，不做强提醒</span></div><input type="number" min="0" step="100" value={data.settings.dailyTarget} onChange={(event) => setDailyTarget(Number(event.target.value))} /></label>
       </section>
 
-</>
+      <SettingsDetail title="壁纸与背景" description="为各空间选择壁纸、插画和纸张"><BackgroundSettingsSection /></SettingsDetail>
+    </>
 }

@@ -14,7 +14,17 @@ import './browser.css'
 import { ManagedBrowserSection } from './managed/ManagedBrowserSection'
 export function BrowserConnectionSection() {
   const backend=useLibraryStore(state=>state.data.companion.browser?.backend)
-  return <><div className="browser-backend-choice" role="group" aria-label="浏览器工作方式"><button type="button" aria-pressed={backend==='managed'} onClick={()=>useLibraryStore.getState().setCompanionBrowser({backend:'managed'})}><strong>小鱼专用浏览器</strong><small>推荐 · 独立登录，真正无窗口</small></button><button type="button" aria-pressed={backend!=='managed'} onClick={()=>useLibraryStore.getState().setCompanionBrowser({backend:undefined})}><strong>现有 Edge 扩展</strong><small>兼容 · 沿用日常浏览器会话</small></button></div>{backend==='managed'?<ManagedBrowserSection/>:<EdgeConnectionSection/>}</>
+  return <section className="settings-section browser-settings-page">
+    <label className="browser-backend-select">
+      <span><strong>查询方式</strong><small>{backend === 'managed' ? '独立会话，在后台打开网页。' : '使用 Edge 扩展，沿用日常浏览器的登录。'}</small></span>
+      <select aria-label="浏览器工作方式" value={backend ?? 'edge'}
+        onChange={event => useLibraryStore.getState().setCompanionBrowser({ backend: event.target.value === 'managed' ? 'managed' : undefined })}>
+        <option value="managed">小鱼专用浏览器</option>
+        <option value="edge">Edge 扩展（兼容）</option>
+      </select>
+    </label>
+    {backend === 'managed' ? <ManagedBrowserSection /> : <EdgeConnectionSection />}
+  </section>
 }
 function EdgeConnectionSection() {
   const settings = useLibraryStore(state => state.data.companion.browser)
@@ -45,8 +55,7 @@ function EdgeConnectionSection() {
     await configureBrowser(browserConnectionEnabled(), current?.sites ?? [], false, current?.cachedLoginSites ?? [],current?.interactionSites??[])
     const value = await browserNative<{code:string}>('browser_bridge_connect'); setCode(value.code)
   }
-  return <details className="permission-scope-group browser-connection"><summary><span>Edge 浏览器连接</span><small>{!enabled ? '未开启' : status?.online ? '已在线' : status?.paired ? '已配对 · 等待Edge' : '待连接'}</small></summary>
-    <div className="browser-connection-body">
+  return <div className="browser-connection-body browser-direct">
       <div className="setting-row"><div><strong>让小鱼访问已授权网站</strong><span>沿用这个 Edge 的登录状态，网站只在下方添加。</span></div><button type="button" aria-label="允许读取已登录浏览器" aria-pressed={enabled} className={enabled ? 'switch on' : 'switch'} onClick={() => useLibraryStore.getState().setCompanionBrowser({ enabled: !enabled })}><i /></button></div>
       {!trust && <p className="browser-note">外部模型处理当前关闭，AI浏览器查询不会执行；示范学习仍可只在本机记录操作步骤。</p>}
       {enabled && <>
@@ -71,6 +80,5 @@ function EdgeConnectionSection() {
         <p className="browser-privacy-note"><ShieldCheck size={14}/><span>不读取Cookie或密码。普通规划只给模型固定控件语义和必要统计；明确要求理解正文时，节选仍需单独审查发送。最小信息也属于外发，自动脱敏并非绝对保护。登录、导航与检索分别授权，不包含发送、删除或支付。</span></p>
       </>}
       {error && <p role="alert">{error}</p>}
-    </div>
-  </details>
+  </div>
 }

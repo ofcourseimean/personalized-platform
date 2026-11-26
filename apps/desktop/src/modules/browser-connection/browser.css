@@ -1,5 +1,5 @@
 .browser-connection-body{display:grid;gap:16px;padding:18px 4px 4px;font-size:12px}
-.browser-backend-choice{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0 14px}.browser-backend-choice button{display:grid;gap:5px;text-align:left;padding:13px;border:1px solid var(--line);border-radius:12px;color:var(--ink-soft);background:var(--surface);font:inherit;cursor:pointer}.browser-backend-choice button[aria-pressed=true]{color:var(--ink);border-color:var(--ink-soft);background:var(--surface-soft)}.browser-backend-choice strong{font-size:12px;font-weight:500}.browser-backend-choice small{font-size:11px;line-height:1.6}.browser-managed-login{display:grid;gap:10px;padding:14px;border-radius:12px;background:var(--surface-soft)}.browser-managed-login>strong{font-size:12px;font-weight:500}.browser-managed-login>button{justify-self:start}
+.browser-managed-login{display:grid;gap:10px;padding:14px;border-radius:12px;background:var(--surface-soft)}.browser-managed-login>strong{font-size:12px;font-weight:500}.browser-managed-login>button{justify-self:start}
 .settings-view .browser-connection-body .setting-row{flex-direction:row;align-items:center;flex-wrap:nowrap;gap:18px}
 .browser-connection-body .setting-row>div{flex:1;min-width:0}.browser-connection-body .setting-row span{display:block;line-height:1.7}
 .browser-note{color:var(--ink-soft);font-size:12px;line-height:1.8;margin:0}
@@ -34,3 +34,28 @@
 .browser-sites-empty{display:flex;align-items:center;justify-content:center;gap:12px;padding:24px 12px;color:var(--ink-soft);background:var(--surface-soft);border-radius:12px}.browser-sites-empty small{display:block;font-size:11px;margin-top:4px}
 .browser-privacy-note{display:flex;align-items:flex-start;gap:8px;margin:0;color:var(--ink-soft);font-size:11px;line-height:1.8}.browser-privacy-note svg{flex-shrink:0;margin-top:3px}
 @media(max-width:480px){.browser-site-card{padding:12px}.browser-site-icon{display:none}.browser-site-top{gap:6px}.browser-add-site{flex-wrap:wrap}.browser-add-site input{flex-basis:100%}.browser-add-site button{width:100%}.browser-connection-status small{display:none}}
+
+.browser-backend-select { display: flex; align-items: center; justify-content: space-between; gap: 10px 18px; flex-wrap: wrap; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
+.browser-backend-select strong, .browser-backend-select small { display: block; }
+.browser-backend-select small { color: var(--ink-soft); font-size: 12px; margin-top: 4px; }
+.browser-backend-select select, .browser-site-presets select { min-width: 0; max-width: 100%; min-height: 36px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); font-size: 12px; padding: 6px 9px; }
+.browser-direct { padding: 0; }
+.settings-view .browser-direct > .setting-row { min-height: 52px; padding: 8px 0; }
+.browser-direct .browser-connection-status > button { margin-inline-start: auto; }
+.managed-sites { display: grid; gap: 12px; min-width: 0; padding: 4px 0 0; }
+.managed-sites h3 { font: 500 16px/1.4 var(--serif); margin: 0; }
+.browser-site-presets { display: grid; grid-template-columns: minmax(135px, .75fr) minmax(0, 1.25fr); gap: 8px; align-items: stretch; }
+.browser-site-presets:not(:has(.browser-quick-site)) { grid-template-columns: minmax(0, 1fr); }
+.browser-site-presets:not(:has(label)) { grid-template-columns: minmax(0, 1fr); }
+.browser-site-presets label { align-content: center; padding: 9px; border: 1px solid var(--line); border-radius: 9px; }
+.browser-quick-site { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 7px 10px; padding: 9px; border-radius: 9px; background: var(--surface-soft); }
+.browser-quick-site strong, .browser-quick-site small { display: block; }
+.browser-quick-site small { color: var(--ink-soft); margin-top: 4px; }
+.browser-quick-site > button { flex: 0 0 auto; }
+.browser-site-group { display: grid; gap: 8px; }
+.browser-profile-purpose { display: grid; gap: 12px; }
+.browser-advanced { padding-top: 9px; border-top: 1px solid var(--line); }
+@media (max-width: 600px) {
+  .browser-site-presets { grid-template-columns: minmax(0, 1fr); }
+  .browser-quick-site { order: -1; }
+}

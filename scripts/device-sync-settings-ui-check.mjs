@@ -36,7 +36,7 @@ try {
     const saved = JSON.parse(localStorage.getItem('yiyu.library.preview.v1'))
     saved.data.session.activeView = 'settings'
     localStorage.setItem('yiyu.library.preview.v1', JSON.stringify(saved))
-    localStorage.setItem('yiyu.settings.activeTab', 'data')
+    localStorage.setItem('yiyu.settings.activeTab', 'sync')
   })
   await page.reload()
   const panel = page.locator('.device-sync')

@@ -12,11 +12,7 @@ export function BrowserSiteRoutingSettings({ onChooseSite }: { onChooseSite: (or
   return <details className="browser-site-options browser-site-routing">
     <summary>网站用途与智能选站<small>{settings.semanticRouting ? '已开启' : '可选'}</small></summary>
     <div className="browser-site-option-body">
-      <label className="browser-cached-login">
-        <input type="checkbox" checked={settings.semanticRouting === true}
-          onChange={event => useLibraryStore.getState().setCompanionBrowser({ semanticRouting: event.target.checked })} />
-        <span>按网站用途自动选站<small>发送脱敏后的请求和候选用途说明，找到合适的站点后核对本机授权。</small></span>
-      </label>
+      <BrowserSmartRouting />
       {proposals.length > 0 && <>
         <label htmlFor={selectId}>选一个预设网站</label>
         <div className="browser-add-site">
@@ -30,4 +26,13 @@ export function BrowserSiteRoutingSettings({ onChooseSite }: { onChooseSite: (or
       </>}
     </div>
   </details>
+}
+
+export function BrowserSmartRouting() {
+  const enabled = useLibraryStore(state => state.data.companion.browser?.semanticRouting === true)
+  return <label className="browser-cached-login">
+    <input type="checkbox" checked={enabled}
+      onChange={event => useLibraryStore.getState().setCompanionBrowser({ semanticRouting: event.target.checked })} />
+    <span>按网站用途自动选站<small>向模型发送脱敏请求和候选网站用途，选中后核对本机授权。</small></span>
+  </label>
 }

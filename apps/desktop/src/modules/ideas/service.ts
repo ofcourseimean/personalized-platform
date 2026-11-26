@@ -29,7 +29,7 @@ export async function generateIdeaRound(request: IdeaRequest, factory: typeof cr
   let rejectAbort: (() => void) | undefined
   try {
     assertCurrent()
-    if (config.providerId === 'mock') throw new Error('请先在设置 → AI 伙伴中连接对话模型；想法工坊会复用同一份 API 配置。')
+    if (config.providerId === 'mock') throw new Error('请先在设置 → 小鱼 → 模型服务中连接对话模型；想法工坊会复用同一份 API 配置。')
     const session = initial.ideas!.sessions.find(item => item.id === request.id)!
     // Keep actual newlines/quotes until the existing egress gateway has scanned
     // them. Serializing user material first can hide credential boundaries.

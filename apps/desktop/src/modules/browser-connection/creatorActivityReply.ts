@@ -20,7 +20,7 @@ export function creatorActivityReply(result: AgentToolResult, target: CreatorAct
     case 'ambiguous': return `B 站用户搜索返回了多个叫「${plain(name)}」的账号。请给我个人空间链接，我可以按链接查最新动态。`
     case 'not_found': return `我在 B 站用户搜索里没找到能核对为「${plain(name)}」的账号。可以补充当前昵称或个人空间链接。`
     case 'empty': return `「${plain(name)}」的个人空间当前显示暂无可见动态。`
-    case 'login_required': return 'B 站个人空间要求登录。请在「小鱼专用浏览器」里打开该网站的登录窗口，登录完成后结束登录，小鱼会续查当前请求。'
+    case 'login_required': return 'B 站个人空间要求登录。请在「设置 → 网页与电脑」的 B 站一栏点击「登录」，登录完成后结束登录，小鱼会续查当前请求。'
     case 'identity_unverified': return '我打开了 B 站个人空间，但页面还没有提供能核对的昵称，暂时不能确认是哪位创作者。'
     case 'time_unverified': return '我读到了动态列表，但发布时间不足以判断哪条最新。'
     case 'unavailable': return target.uid ? 'B 站个人空间尚未返回可核对的动态，本次结果未知。' : 'B 站未返回可以核对的账号或动态。若你有个人空间链接，可以直接按链接继续查。'
