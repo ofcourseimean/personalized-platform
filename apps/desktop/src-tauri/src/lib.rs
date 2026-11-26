@@ -131,6 +131,7 @@ pub fn run() {
             managed_browser::managed_browser_status,
             managed_browser::managed_browser_cancel,
             managed_browser::managed_browser_request,
+            managed_browser::managed_browser_creator_activity,
             managed_browser::managed_browser_login,
             managed_browser::managed_browser_finish_login,
             managed_browser::recording::managed_browser_record,

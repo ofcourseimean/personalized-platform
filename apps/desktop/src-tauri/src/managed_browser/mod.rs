@@ -1,5 +1,6 @@
 mod assets;
 mod attachment;
+mod creator_activity;
 mod job;
 mod worker;
 mod policy;
@@ -83,6 +84,19 @@ pub async fn managed_browser_request(app:AppHandle,window:WebviewWindow,runtime:
             attachment::verify(&assets::root(&app)?,&mut result)?;
         }
         Ok(result)
+    }).await.map_err(|_|"BROWSER_RUNTIME:".to_string())?
+}
+#[tauri::command]
+pub async fn managed_browser_creator_activity(app:AppHandle,window:WebviewWindow,runtime:State<'_,ManagedBrowserRuntime>,name:Option<String>,uid:Option<String>,expected_epoch:u64)->Result<Value,String>{
+    main_only(&window)?;
+    {
+        let config = runtime.inner.config.lock().map_err(|_|"BROWSER_STATE:")?;
+        creator_activity::authorize(&config, name.as_deref(), uid.as_deref())?;
+    }
+    let runtime = runtime.inner.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let data = execute(&app, &runtime, expected_epoch, json!({"kind":"creatorActivity","name":name,"uid":uid}))?;
+        creator_activity::validate(name.as_deref(), uid.as_deref(), data)
     }).await.map_err(|_|"BROWSER_RUNTIME:".to_string())?
 }
 #[tauri::command]

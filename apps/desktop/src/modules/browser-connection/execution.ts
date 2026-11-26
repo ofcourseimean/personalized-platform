@@ -6,6 +6,7 @@ import { checkBrowserParameter } from './parameters'
 import { browserNativeError } from './nativeError'
 import { BROWSER_AGENT_LIMITS } from './agentPolicy'
 import { assertAttachmentChoice } from './attachmentSelection'
+import { extractPageEvidence, type PageEvidenceRequest } from './pageEvidence'
 
 interface Observation {observationId:string;text:string;url:string;title:string;loading:boolean;truncated:boolean;loginState?:string;controls:Array<{id:string;operation:string;name?:string}>}
 export interface BrowserEvidenceRequest {origin:string;tabId:number;observationId:string;quotes:string[];answer:string}
@@ -29,7 +30,18 @@ export class BrowserExecution {
     const page=result.data as Observation|undefined
     if(page&&typeof page.observationId==='string'&&typeof page.text==='string'&&Array.isArray(page.controls))this.observations.set(`${request.origin}:${request.tabId}`,page)
   }
-  owns(input:BrowserEvidenceRequest){return this.observations.get(`${input.origin}:${input.tabId}`)?.observationId===input.observationId}
+  observedLocation(input: Pick<BrowserEvidenceRequest, 'origin' | 'tabId' | 'observationId'>) {
+    const page = this.observations.get(`${input.origin}:${input.tabId}`)
+    return page?.observationId === input.observationId ? page.url : undefined
+  }
+  owns(input: Pick<BrowserEvidenceRequest, 'origin' | 'tabId' | 'observationId'>){return this.observations.get(`${input.origin}:${input.tabId}`)?.observationId===input.observationId}
+  extract(input: PageEvidenceRequest) {
+    const page = this.observations.get(`${input.origin}:${input.tabId}`)
+    if (!page || page.observationId !== input.observationId || page.loading || page.loginState && page.loginState !== 'continued') {
+      throw browserNativeError('BROWSER_STALE:')
+    }
+    return { excerpts: extractPageEvidence(this.goal, page.text, input.phrase), truncated: page.truncated }
+  }
   verify(input:BrowserEvidenceRequest){
     this.session.transition('verifying')
     const page=this.observations.get(`${input.origin}:${input.tabId}`)

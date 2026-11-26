@@ -8,12 +8,15 @@ import { protectLoginRedirects } from './login-redirects.mjs'
 import { ManagedRecorder } from './recording.mjs'
 import { resolve } from 'node:path'
 import { saveDocument } from './download.mjs'
+import { BrowserJourney } from './journey.mjs'
+import { creatorSites, readCreatorActivity } from './creator-activity.mjs'
 
 export class BrowserEngine {
   constructor(profile, launcher=options=>chromium.launchPersistentContext(profile,options)) {
     this.launcher=launcher;this.context=null;this.mode='idle';this.sites=[];this.interactions=[]
     this.downloadDirectory=resolve(profile,'..','attachments')
     this.pages=new Map();this.observations=new Map();this.sequence=0;this.taskSite=null;this.logins=[];this.loginAttempts=new Set()
+    this.readOnlyPages = new WeakSet()
   }
   async close() {
     await this.recorder?.stop();this.recorder=undefined
@@ -37,6 +40,12 @@ export class BrowserEngine {
     this.context=context;this.mode=mode
     const network=networkPolicy(this.sites,{manualLogin:mode==='login'})
     await context.route('**/*',async route=>{
+      const request = route.request()
+      if (!['GET', 'HEAD', 'OPTIONS'].includes(request.method())) {
+        let readOnly = this.readOnlyAction
+        try { readOnly ||= this.readOnlyPages.has(request.frame().page()) } catch { /* A new navigation may not have a frame yet. */ }
+        if (readOnly) return route.abort('blockedbyclient')
+      }
       if(route.request().isNavigationRequest() && this.mode!=='login' && new URL(route.request().url()).origin!==this.taskSite)return route.abort('blockedbyclient')
       return network(route)
     })
@@ -83,6 +92,21 @@ export class BrowserEngine {
     if(result===null)await this.close()
     return result
   }
+  async creatorActivity(name, uid) {
+    const sites = uid ? [creatorSites[1]] : creatorSites
+    if (!sites.every(site => this.sites.includes(site))) throw new Error('BROWSER_SITE_PERMISSION')
+    if (this.recorder || this.mode === 'login' || this.mode === 'recording') throw new Error('BROWSER_LOGIN_ACTIVE')
+    await this.launch('background')
+    const page = await this.context.newPage()
+    this.readOnlyPages.add(page)
+    const previousSite = this.taskSite
+    const journey = new BrowserJourney(page, sites, site => { this.taskSite = site })
+    try { return await readCreatorActivity(journey, name, uid) }
+    finally {
+      await page.close().catch(() => {})
+      this.taskSite = previousSite
+    }
+  }
   async request(request) {
     const site=origin(request.origin)
     if(!this.sites.includes(site))throw new Error('BROWSER_SITE_PERMISSION')
@@ -117,12 +141,14 @@ export class BrowserEngine {
       if(!this.interactions.includes(site))throw new Error('BROWSER_SITE_PERMISSION')
       const observation=this.observations.get(request.tabId);this.observations.delete(request.tabId)
       let nextTabId
+      this.readOnlyAction = ['navigate','search'].includes(request.interaction?.operation)
+      if (this.readOnlyAction) this.readOnlyPages.add(page)
       try{
         const popup=await act(page,observation,request.interaction,ref=>saveDocument(ref,this.downloadDirectory))
         if(popup?.attachment)return {tabId:request.tabId,origin:site,actionStatus:'downloaded',attachment:popup.attachment}
-        if(popup){await popup.waitForLoadState('domcontentloaded',{timeout:8000}).catch(()=>{throw new Error('BROWSER_ACTION_UNKNOWN')});if(new URL(popup.url()).origin!==site)throw new Error('BROWSER_ACTION_UNKNOWN');this.register(popup);nextTabId=[...this.pages.entries()].find(([,value])=>value===popup)?.[0]}
+        if(popup){if(this.readOnlyAction)this.readOnlyPages.add(popup);await popup.waitForLoadState('domcontentloaded',{timeout:8000}).catch(()=>{throw new Error('BROWSER_ACTION_UNKNOWN')});if(new URL(popup.url()).origin!==site)throw new Error('BROWSER_ACTION_UNKNOWN');this.register(popup);nextTabId=[...this.pages.entries()].find(([,value])=>value===popup)?.[0]}
         try{await this.settle(popup??page)}catch{throw new Error('BROWSER_ACTION_UNKNOWN')}
-      }finally{await release(observation)}
+      }finally{this.readOnlyAction = false;await release(observation)}
       return {tabId:request.tabId,origin:site,actionStatus:'dispatched',...(nextTabId?{nextTabId}:{})}
     }
     throw new Error('BROWSER_ARGUMENT')

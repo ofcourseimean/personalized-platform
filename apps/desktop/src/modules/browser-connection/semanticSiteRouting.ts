@@ -46,7 +46,7 @@ export function routeBrowserTurn(message: string, data: LibraryData, localTime: 
     || interpretLiveStatus(command) || parseLiveRoomIntent(command) || hasExplicitBrowserTarget(command)) return
   const existing = resolveBrowserTask(command, data.companion)
   // Keep deterministic live/dynamics and unambiguous established mail routing.
-  if (existing && (existing.objective === 'followed_live' || existing.objective === 'updates'
+  if (existing && (existing.creator || existing.objective === 'followed_live' || existing.objective === 'updates'
     || existing.objective === 'mail' && existing.origins.length === 1)) return
 
   const directory = siteDirectory(browser)

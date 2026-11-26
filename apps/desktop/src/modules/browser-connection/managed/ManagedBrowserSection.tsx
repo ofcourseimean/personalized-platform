@@ -1,7 +1,7 @@
 import { useEffect,useState } from 'react'
 import { Globe2,LogIn,ShieldCheck,Square,X } from 'lucide-react'
 import { useLibraryStore } from '../../../state/useLibraryStore'
-import { browserOrigin,browserPageUrl } from '../../../domain/browser'
+import { bilibiliCreatorSites,browserOrigin,browserPageUrl } from '../../../domain/browser'
 import { BrowserSiteProfileFields } from '../BrowserSiteProfileFields'
 import { BrowserSiteRoutingSettings } from '../BrowserSiteRoutingSettings'
 import { browserNative } from '../native'
@@ -14,6 +14,7 @@ export function ManagedBrowserSection(){
   const settings=useLibraryStore(state=>state.data.companion.browser)
   const [status,setStatus]=useState<ManagedBrowserStatus>(),[site,setSite]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState('')
   const enabled=settings?.enabled===true,sites=settings?.sites??[]
+  const creatorEnabled=bilibiliCreatorSites.every(origin=>sites.includes(origin))
   const [clearSession,setClearSession]=useState(false)
   useEffect(()=>{
     if(!('__TAURI_INTERNALS__' in window))return
@@ -41,6 +42,16 @@ export function ManagedBrowserSection(){
       {status?.mode==='login'&&<div className="browser-managed-login"><strong>登录完成后，回到这里继续</strong><p className="browser-note">可直接使用网站的密码登录；只有网站要求时才需额外认证。小鱼不读取登录窗口。“结束登录”后会自动续查尚未过期的当前问题，重新核对页面，不把登录当作查询成功。</p><button type="button" disabled={busy} onClick={()=>void run(async()=>{const result=await finishManagedBrowserLogin();setStatus(result.status);setNotice(result.resumed?'登录窗口已关闭，正在后台重新检查刚才的问题。':result.waiting?'登录窗口已关闭，回到原聊天界面后将自动续查；5分钟内有效。':'专用窗口已关闭。没有待续问题，之后可直接查询。')})}>结束登录 · 转为后台</button></div>}
       <BrowserRecordingCard/>
       <BrowserSiteRoutingSettings onChooseSite={setSite}/>
+      <details className="browser-site-options">
+        <summary>B 站创作者动态<small>{creatorEnabled?'已授权':'可授权'}</small></summary>
+        <div className="browser-site-option-body">
+          <p className="browser-note">专用浏览器会在 B 站搜索对应账号，再读取个人空间的可见动态。</p>
+          {!creatorEnabled&&<button type="button" disabled={busy} onClick={()=>void run(async()=>{
+            const current=useLibraryStore.getState().data.companion.browser?.sites??[]
+            useLibraryStore.getState().setCompanionBrowser({sites:[...new Set([...current,...bilibiliCreatorSites])]})
+          })}>授权用户搜索和个人空间</button>}
+        </div>
+      </details>
       <div className="browser-sites-heading"><strong>已授权网站 <small>{sites.length}</small></strong></div>
       <div className="browser-sites">{sites.map(origin=><div className="browser-site-card" key={origin}><div className="browser-site-top"><span className="browser-site-icon"><Globe2 size={17}/></span><span className="browser-site-name"><strong>{settings?.profiles?.find(profile=>profile.origin===origin)?.label||new URL(origin).hostname}</strong><small>独立本机会话</small></span><button type="button" disabled={busy} onClick={()=>void run(()=>login(origin))}><LogIn size={13}/>登录</button><button type="button" className="browser-site-remove" aria-label={`撤销 ${origin}`} onClick={()=>useLibraryStore.getState().setCompanionBrowser({sites:sites.filter(value=>value!==origin)})}><X size={13}/></button></div><details className="browser-site-options"><summary>网站选项<small>用途、入口与操作范围</small></summary><div className="browser-site-option-body"><BrowserSiteProfileFields site={origin}/></div></details></div>)}</div>
       {!sites.length&&<div className="browser-sites-empty"><Globe2 size={22}/><span>添加常用网站<small>邮箱、通知、学习或其他网页</small></span></div>}

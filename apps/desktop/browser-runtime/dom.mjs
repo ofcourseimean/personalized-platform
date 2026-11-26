@@ -14,7 +14,9 @@ export function describeElement(element) {
   if (tag==='a') {
     try {const url=new URL(element.href);if(url.origin!==location.origin || url.protocol!=='https:' || url.username || url.password || /logout|delete|remove|unsubscribe|purchase|payment|transfer|switch[_/-]?(?:account|user)|impersonat|reset[_/-]?password|支付|删除|转账/i.test(url.href))return null
       if (download || element.hasAttribute('download') || /\.(?:pdf|docx|xlsx|pptx)$/i.test(url.pathname)) return {name:name||'下载附件',operation:'download',href:url.href}
-      return {name:name||'查看链接',operation:'invoke',href:url.href,...(element.target==='_blank'?{opensTab:true}:{})}
+      // A canonical observed link has a direct, repeatable navigation target.
+      // Query strings and in-page anchors retain regular click semantics.
+      return {name:name||'查看链接',operation:!url.search&&!url.hash?'navigate':'invoke',href:url.href,...(element.target==='_blank'?{opensTab:true}:{})}
     } catch {return null}
   }
   if (download) return null
@@ -34,9 +36,9 @@ export function describeElement(element) {
   if ((tag==='input' && ['','text','search','date','month'].includes(type)) || tag==='select') {
     const form=element.closest('form')
     if (form?.querySelector('input[type="password"]') || form && form.method.toLowerCase()!=='get') return null
-    if (!/(?:搜索|查找|查询|筛选|排序|起始|开始|结束|截止|日期|月份|search|query|filter|keyword|sort|start|end|date|month)/i.test(hint)) return null
+    if (type!=='search'&&role!=='searchbox'&&!/(?:搜索|查找|查询|筛选|排序|起始|开始|结束|截止|日期|月份|search|query|filter|keyword|sort|start|end|date|month)/i.test(hint)) return null
     if(tag==='select') return {name,operation:'select',options:Array.from(element.options).slice(0,20).map(option=>clean(option.textContent))}
-    return {name,operation:type==='search' || /搜索|search|查找|查询/i.test(hint)?'search':'fill',...(['date','month'].includes(type)?{format:type}:{})}
+    return {name:name||(type==='search'||role==='searchbox'?'搜索':''),operation:type==='search' || role==='searchbox' || /搜索|search|查找|查询/i.test(hint)?'search':'fill',...(['date','month'].includes(type)?{format:type}:{})}
   }
   return null
 }

@@ -20,6 +20,7 @@ reader.on('line',line=>{
       else if(command.kind==='login')data=await engine.login(command.origin,command.url)
       else if(command.kind==='finish')data=await engine.finishLogin()
       else if(command.kind==='record')data=await engine.record(command)
+      else if(command.kind==='creatorActivity')data=await engine.creatorActivity(command.name,command.uid)
       else if(command.kind==='request')data=await engine.request(command.request)
       else throw new Error('BROWSER_ARGUMENT')
       process.stdout.write(`${JSON.stringify({id,ok:true,data})}\n`)

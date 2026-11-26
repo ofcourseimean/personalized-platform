@@ -22,8 +22,8 @@ impl Config{
             "act"=>{
                 if request.tab_id.is_none()||!self.interactions.contains(&request.origin){return Err("BROWSER_SITE_PERMISSION:".into())}
                 let action=request.interaction.as_ref().ok_or("BROWSER_ARGUMENT:")?;
-                if !["invoke","search","fill","select","scroll","download"].contains(&action.operation.as_str())||[&action.element_id,&action.observation_id].iter().any(|id|id.len()!=36||!id.bytes().all(|byte|byte.is_ascii_hexdigit()||byte==b'-')){return Err("BROWSER_ARGUMENT:".into())}
-                if action.operation=="download"&&action.query.is_some(){return Err("BROWSER_ARGUMENT:".into())}
+                if !["invoke","navigate","search","fill","select","scroll","download"].contains(&action.operation.as_str())||[&action.element_id,&action.observation_id].iter().any(|id|id.len()!=36||!id.bytes().all(|byte|byte.is_ascii_hexdigit()||byte==b'-')){return Err("BROWSER_ARGUMENT:".into())}
+                if ["download","navigate"].contains(&action.operation.as_str())&&action.query.is_some(){return Err("BROWSER_ARGUMENT:".into())}
                 if ["search","fill","select"].contains(&action.operation.as_str())&&action.query.as_ref().is_none_or(|query|query.trim().is_empty()||query.chars().count()>200||query.contains(['\n','\r','\0'])){return Err("BROWSER_ARGUMENT:".into())}
             },
             "followed_live"=>{if request.tab_id.is_some()||request.origin!="https://live.bilibili.com"||["https://api.bilibili.com","https://api.live.bilibili.com"].iter().any(|site|!self.sites.iter().any(|value|value==site)){return Err("BROWSER_SITE_PERMISSION:".into())}},

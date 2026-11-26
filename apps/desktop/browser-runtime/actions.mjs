@@ -1,5 +1,5 @@
 import { describeElement } from './dom.mjs'
-import { interaction } from './policy.mjs'
+import { interaction, origin, pageUrl } from './policy.mjs'
 export async function act(page, observation, raw, download) {
   const action=interaction(raw)
   if(!observation || observation.value?.loading || observation.value?.loginState&&observation.value.loginState!=='continued' || observation.observationId!==action.observationId || observation.url!==page.url() || Date.now()-observation.created>60000)throw new Error('BROWSER_STALE')
@@ -12,6 +12,21 @@ export async function act(page, observation, raw, download) {
   if(action.operation==='download'){
     if(!download)throw new Error('BROWSER_ARGUMENT')
     return { attachment:await download(ref) }
+  }
+  if (action.operation === 'navigate') {
+    const site = origin(page.url())
+    const target = pageUrl(live.href, site)
+    const destination = live.opensTab ? await page.context().newPage() : page
+    try {
+      if (page.url() !== observation.url || !await ref.document.evaluate(node => node === document.documentElement).catch(() => false)
+        || JSON.stringify(await ref.handle.evaluate(describeElement).catch(() => null)) !== JSON.stringify(live)) throw new Error('BROWSER_STALE')
+      await destination.goto(target, { waitUntil: 'domcontentloaded', timeout: 10000 }).catch(() => { throw new Error('BROWSER_ACTION_UNKNOWN') })
+      if (origin(destination.url()) !== site) throw new Error('BROWSER_ACTION_UNKNOWN')
+      return live.opensTab ? destination : undefined
+    } catch (error) {
+      if (destination !== page) await destination.close().catch(() => {})
+      throw error
+    }
   }
   if(action.operation==='invoke') {
     // Trial dispatch cannot submit. Once real dispatch starts a timeout may
@@ -36,8 +51,11 @@ export async function act(page, observation, raw, download) {
       if(!await ref.handle.evaluate((node,value)=>node.value===value,action.query))throw new Error('input not reflected')
     }catch{throw new Error('BROWSER_ACTION_UNKNOWN')}
     if(action.operation==='search') {
-      const safe=await ref.handle.evaluate(element=>{const form=element.form;return !!form && form.method.toLowerCase()==='get' && new URL(form.action,location.href).origin===location.origin && !form.querySelector('input[type="password"]')})
-      // No unknown key handlers/POST submission on ordinary fields.
+      const safe = await ref.handle.evaluate(element => {
+        const form = element.form
+        if (form) return form.method.toLowerCase() === 'get' && new URL(form.action, location.href).origin === location.origin && !form.querySelector('input[type="password"]')
+        return element.type === 'search' || element.getAttribute('role') === 'searchbox' || Boolean(element.closest('[role="search"]'))
+      })
       if(safe)try{await ref.handle.press('Enter',{timeout:5000})}catch{throw new Error('BROWSER_ACTION_UNKNOWN')}
     }
   }

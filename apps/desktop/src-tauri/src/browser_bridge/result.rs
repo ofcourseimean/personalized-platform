@@ -67,7 +67,7 @@ fn validate_inner(request:&Request,value:Value,managed:bool)->Result<Value,Strin
             let page: Page = serde_json::from_value(value).map_err(|_| invalid)?;
             if !managed && matches!(page.login_state,Some(LoginState::ManagedLogin|LoginState::ManagedUnfilled|LoginState::ManagedNeedsUser|LoginState::ManagedPending)){return Err(invalid.into())}
             if !request.cached_login && matches!(page.login_state, Some(LoginState::Continued | LoginState::Pending | LoginState::SubmitRejected|LoginState::ManagedUnfilled|LoginState::ManagedNeedsUser|LoginState::ManagedPending)) { return Err(invalid.into()); }
-            let operations:&[&str]=if managed{&["invoke","search","fill","select","scroll","download"]}else{&["invoke","search"]};
+            let operations:&[&str]=if managed{&["invoke","navigate","search","fill","select","scroll","download"]}else{&["invoke","search"]};
             if page.observation_id.as_ref().is_some_and(|id|!reference(id))||page.controls.len()>60||page.controls.iter().any(|control|!reference(&control.id)||!text(&control.name,100)||!operations.contains(&control.operation.as_str()))||!page.controls.is_empty()&&page.observation_id.is_none(){return Err(invalid.into())}
             if Some(page.tab_id) != request.tab_id || page.origin != request.origin || !safe_url(&page.url, Some(&request.origin)) || !text(&page.title, 200) || !text(&page.text, 12000) || page.links.len() > 40 || page.links.iter().any(|link| !text(&link.text, 100) || !safe_url(&link.url, None)) { return Err(invalid.into()); }
             serde_json::to_value(page)

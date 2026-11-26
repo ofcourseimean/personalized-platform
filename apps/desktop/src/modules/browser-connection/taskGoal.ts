@@ -1,4 +1,6 @@
-import { bilibiliBrowserSites, browserOrigin } from '../../domain/browser'
+import { bilibiliBrowserSites, bilibiliCreatorSites, bilibiliSetupSites, browserOrigin } from '../../domain/browser'
+import { stripCompanionAddress } from '../../domain/companionIdentity'
+import { creatorActivityTarget, type CreatorActivityTarget } from '../../domain/creatorActivityIntent'
 import { bilibiliReference } from '../../domain/liveStatusIntent'
 import { matchOperations } from '../../domain/operations/catalog'
 import type { CompanionData } from '../../domain/models'
@@ -17,6 +19,7 @@ export interface BrowserTaskGoal {
   explicitPage?:boolean
   siteChoice?: boolean
   publicSearch?: boolean
+  creator?: CreatorActivityTarget
 }
 const mail = /(?:邮箱|邮件|收件箱|email|mail|inbox)/iu
 const [bilibiliLivePage, ...bilibiliLiveApiOrigins] = bilibiliBrowserSites
@@ -64,9 +67,22 @@ export function bindBrowserSite(message: string, companion: CompanionData, card:
   return { objective, origins: [origin], candidates: [origin], interactionAllowed, ...(downloadAllowed ? { downloadAllowed } : {}), ...(publicSearch ? { publicSearch: true } : {}) }
 }
 export function resolveBrowserTask(message: string, companion: CompanionData): BrowserTaskGoal | undefined {
+  const browser = companion.browser
+  const sites = browser?.sites ?? []
+  const creator = creatorActivityTarget(stripCompanionAddress(message, companion.name),
+    sites.some(site => bilibiliSetupSites.includes(site) || bilibiliCreatorSites.some(origin => origin === site)))
+  if (creator) {
+    const candidates = creator.uid ? [bilibiliCreatorSites[1]] : [...bilibiliCreatorSites]
+    const clarification = browser?.backend !== 'managed'
+      ? '查询创作者最新动态需要小鱼专用浏览器。请在「浏览器工作方式」里启用，并启用「B 站创作者动态」。'
+      : candidates.some(origin => !sites.includes(origin))
+        ? '请在「小鱼专用浏览器」里启用「B 站创作者动态」。一次授权会启用 B 站的用户搜索和个人空间。'
+        : undefined
+    return { objective: 'page', creator, candidates, origins: clarification ? [] : candidates, ...(clarification ? { clarification } : {}) }
+  }
   const objective = browserObjective(message, companion.name)
   if (!objective) return
-  const sites = companion.browser?.sites ?? [], parsed = explicitSites(message), explicit = parsed.sites
+  const parsed = explicitSites(message), explicit = parsed.sites
   if (parsed.invalid) return { objective, origins: [], candidates: [], clarification: '请提供不带账号、密码或端口的HTTPS页面链接；不会从无效链接回退猜测其他账号。' }
   const namedFamilies = families.filter(family => family.names.test(message))
   const namedProfiles=companion.browser?.profiles?.filter(profile=>profile.label&&profile.label.length>=2&&message.toLocaleLowerCase().includes(profile.label.toLocaleLowerCase()))??[]

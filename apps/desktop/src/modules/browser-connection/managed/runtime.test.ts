@@ -11,6 +11,8 @@ describe('local browser executor boundaries',()=>{
   it('requires bounded current references and never accepts a script/password operation',()=>{
     for(const operation of ['javascript','password','delete'])expect(()=>interaction({observationId:crypto.randomUUID(),elementId:crypto.randomUUID(),operation})).toThrow()
     expect(()=>interaction({observationId:crypto.randomUUID(),elementId:crypto.randomUUID(),operation:'fill',query:'password=x'})).toThrow()
+    expect(()=>interaction({observationId:crypto.randomUUID(),elementId:crypto.randomUUID(),operation:'navigate',query:'https://other.example.com'})).toThrow()
+    expect(()=>interaction({observationId:crypto.randomUUID(),elementId:crypto.randomUUID(),operation:'navigate',query:null} as unknown as Parameters<typeof interaction>[0])).not.toThrow()
   })
   it('blocks cross-site navigations before DNS/network dispatch',async()=>{
     let aborted=false,continued=false

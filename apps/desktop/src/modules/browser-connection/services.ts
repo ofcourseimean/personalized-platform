@@ -1,5 +1,5 @@
 import { useLibraryStore } from '../../state/useLibraryStore'
-import { browserOrigin, bilibiliBrowserSites,browserPageUrl } from '../../domain/browser'
+import { browserOrigin, bilibiliBrowserSites,bilibiliCreatorSites,browserPageUrl } from '../../domain/browser'
 import { assertExternalAiAllowed } from '../trust/trustPolicy'
 import { browserAccessEnabled } from './authority'
 import { resolveBrowserTask, type BrowserTaskGoal } from './taskGoal'
@@ -8,12 +8,16 @@ import { BrowserExecution,type BrowserEvidenceRequest } from './execution'
 import { configureManagedBrowser,stopManagedBrowser } from './managed/native'
 import { BrowserCollection,type CollectionRequest,type CollectionEvidence } from './collection'
 import { BROWSER_AGENT_LIMITS } from './agentPolicy'
+import type { PageEvidenceRequest } from './pageEvidence'
+import { browserNativeError } from './nativeError'
 export interface BrowserServices {
   browserTaskGoal?: BrowserTaskGoal
   assertBrowserAuthority?(): void
   authorizeBrowserQueryEgress?():void
   browserStatus?(): Promise<BrowserConnectionStatus>
   browserRead?(request: BrowserReadRequest): Promise<BrowserSnapshot>
+  browserCreatorActivity?(): Promise<BrowserSnapshot>
+  browserExtract?(request: PageEvidenceRequest): Promise<{ excerpts: string[]; truncated: boolean }>
   browserVerify?(request:BrowserEvidenceRequest):Promise<unknown>
   browserContent?(request:{origin:string;tabId:number}):Promise<BrowserSnapshot&{contentReview:true}>
   browserHandoff?():{origin:string;epoch:number}|undefined
@@ -44,6 +48,38 @@ export function createBrowserServices(goal: string, signal?: AbortSignal, chosen
   }
   const services:BrowserServices={
     browserHandoff:()=>handoff,
+    async browserExtract(request) {
+      guard()
+      const expected = execution.observedLocation(request)
+      if (!requested.includes(request.origin) || !expected) throw browserNativeError('BROWSER_STALE:', 'managed_browser_request')
+      const fresh = await services.browserRead!({ kind: 'observe', origin: request.origin, tabId: request.tabId })
+      const page = fresh.data as { observationId?: string; url?: string } | undefined
+      if (fresh.verified !== true || !page?.observationId || page.url !== expected) throw browserNativeError('BROWSER_STALE:', 'managed_browser_request')
+      guard()
+      return execution.extract({ ...request, observationId: page.observationId })
+    },
+    async browserCreatorActivity() {
+      guard()
+      if (!managed || !task?.creator || !requested.includes(bilibiliCreatorSites[1])
+        || !task.creator.uid && !requested.includes(bilibiliCreatorSites[0])) {
+        throw new Error('本轮没有绑定已授权的 B 站创作者动态任务。')
+      }
+      if (reads++ > 0 || Date.now() >= deadline) throw new Error('本次创作者动态查询已经执行过。')
+      const status = await configureManagedBrowser()
+      guard()
+      const cancel = () => { void stopManagedBrowser().catch(() => undefined) }
+      signal?.addEventListener('abort', cancel, { once: true })
+      try {
+        const result = await browserNative<BrowserSnapshot>('managed_browser_creator_activity', { ...task.creator, expectedEpoch: status.epoch })
+        guard()
+        if (result.verified === true && (result.data as { status?: string })?.status === 'login_required') {
+          handoff = { origin: bilibiliCreatorSites[1], epoch: status.epoch }
+        }
+        return result
+      } finally {
+        signal?.removeEventListener('abort', cancel)
+      }
+    },
     async browserCollect(request){
       guard();if(!managed)throw new Error('连续浏览目前只在专用浏览器启用，兼容模式仍可逐页观察')
       if(!/(?:全部|所有|查全|多页|翻页|逐页|连续|继续查找|汇总|all\b|pages?\b)/iu.test(goal))throw new Error('本次只要求普通查询，未授权连续翻页；如需汇总请明确范围')

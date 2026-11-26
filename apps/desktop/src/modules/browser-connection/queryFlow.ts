@@ -12,6 +12,7 @@ export function unboundBrowserToolBlock(message: string, name: string) {
 }
 
 export function browserPurposeBlock(message: string, call: AgentToolCall, task?: BrowserTaskGoal) {
+  if (call.name === 'browser.creator_activity') return task?.creator ? undefined : '本轮没有绑定创作者个人空间查询。'
   if (call.name !== 'browser.followed_live') return
   if ((task?.objective ?? browserObjective(message)) !== 'followed_live') return '关注直播工具只能回答当前关注主播的开播情况，不能回答视频更新、邮件或普通网页问题；本次没有请求这个用途。'
 }
@@ -27,16 +28,16 @@ export class BrowserQueryFlow {
   private loadingRecoveries=0
   constructor(task: BrowserTaskGoal, message: string) { this.task = task; this.message = message }
   get initialCall(): AgentToolCall | undefined {
-    if (this.task.clarification || this.task.objective === 'followed_live' || this.task.origins.length !== 1) return
+    if (this.task.clarification || this.task.creator || this.task.objective === 'followed_live' || this.task.origins.length !== 1) return
     this.prepared = Boolean(this.task.explicitPage)
     return this.call(this.prepared ? 'browser.ensure_page' : 'browser.tabs', { origin: this.task.origins[0] })
   }
   advance(call: AgentToolCall, result: AgentToolResult): { nextCall?: AgentToolCall; reply?: string } | undefined {
     if(call.name==='browser.collect'||call.name==='browser.read_content'){this.requiresVerification=true;return}
-    if (!['browser.tabs','browser.ensure_page','browser.read_page','browser.observe','browser.act'].includes(call.name)) return
     const code=result.error?.browserCode
+    if(['browser.act','browser.extract'].includes(call.name)&&!result.success&&['BROWSER_STALE','BROWSER_ACTION_BLOCKED'].includes(code??'')&&this.staleRecoveries++<2)return {nextCall:this.call('browser.observe',{origin:this.task.origins[0],tabId:(call.arguments as {tabId:number}).tabId})}
+    if (!['browser.tabs','browser.ensure_page','browser.read_page','browser.observe','browser.act'].includes(call.name)) return
     if(!result.success&&code==='BROWSER_PAGE_PENDING'&&['browser.read_page','browser.observe'].includes(call.name)&&this.loadingRecoveries++<1)return {nextCall:this.call('browser.observe',{origin:this.task.origins[0],tabId:(call.arguments as {tabId:number}).tabId})}
-    if(call.name==='browser.act'&&!result.success&&['BROWSER_STALE','BROWSER_ACTION_BLOCKED'].includes(code??'')&&this.staleRecoveries++<2)return {nextCall:this.call('browser.observe',{origin:this.task.origins[0],tabId:(call.arguments as {tabId:number}).tabId})}
     if(call.name==='browser.act'&&!result.success&&!this.checkedUncertainAction&&result.error?.code!=='PermissionDenied'&&(!code||code==='BROWSER_ACTION_UNKNOWN')&&!/授权|权限|取消|停止|不在线|失效/u.test(result.error?.message??'')){
       this.checkedUncertainAction=true
       return {nextCall:this.call('browser.observe',{origin:this.task.origins[0],tabId:(call.arguments as {tabId:number}).tabId})}

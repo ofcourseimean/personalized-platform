@@ -7,6 +7,7 @@ export class BrowserEngine {
   login(site:string,url:string):Promise<{mode:string}>
   finishLogin():Promise<{mode:string;origin:string}>
   record(command:{action:string;origin?:string;url?:string;recordingId?:string}):Promise<unknown>
+  creatorActivity(name?: string, uid?: string): Promise<unknown>
   close():Promise<void>
   request(request:{kind:string;origin:string;tabId?:number;targetUrl?:string;interaction?:unknown;cachedLogin?:boolean}):Promise<unknown>
 }

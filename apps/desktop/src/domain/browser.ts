@@ -21,6 +21,7 @@ export interface BrowserSettings {
 }
 export const bilibiliBrowserSites = ['https://live.bilibili.com', 'https://api.bilibili.com', 'https://api.live.bilibili.com']
 export const bilibiliSetupSites = [...bilibiliBrowserSites, 'https://t.bilibili.com', 'https://www.bilibili.com']
+export const bilibiliCreatorSites = ['https://search.bilibili.com', 'https://space.bilibili.com'] as const
 export function browserOrigin(raw: string) {
   const url = new URL(raw)
   if (url.protocol !== 'https:' || url.username || url.password || url.port || url.search || url.hash || url.pathname !== '/' || !url.hostname.includes('.') || url.hostname.includes('*') || /^[\d.]+$/u.test(url.hostname) || url.hostname.includes(':') || /\.(?:local|localhost|internal|test|invalid)$/u.test(url.hostname)) throw new Error('请填写精确的公共HTTPS网站域名，不含端口、路径或通配符')

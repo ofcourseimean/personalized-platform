@@ -19,6 +19,8 @@ import { PublicSiteFlow } from '../../browser-connection/publicSiteFlow'
 import { librarySeatOrigin, prepareLibrarySeatQuery } from '../../browser-connection/librarySeats'
 import { AttachmentFlow } from '../../browser-connection/attachmentFlow'
 import { followedLiveReply } from '../../browser-connection/followedReply'
+import { creatorActivityReply } from '../../browser-connection/creatorActivityReply'
+import { escapePageText } from '../../browser-connection/pageEvidence'
 import { ReplySession } from '../replies/session'
 import { REPLY_PROMPT } from '../replies/modelReply'
 import { QUERY_INTENT_PROMPT } from './queryIntent'
@@ -147,6 +149,9 @@ export async function runAgent(input: RunAgentInput) {
     return finishLocal('你想查哪位主播？告诉我直播昵称就可以。', true)
   }
   const publicSite = !input.operation && browserTask?.publicSearch && browserTask.origins.length === 1 ? new PublicSiteFlow(browserTask.origins[0], command) : undefined
+  const creatorCall: AgentToolCall | undefined = !input.operation && browserTask?.creator
+    ? { id: `browser-creator-${crypto.randomUUID()}`, name: 'browser.creator_activity', arguments: {} }
+    : undefined
   const librarySeats = !input.operation && browserTask?.origins[0] === librarySeatOrigin && browserTask.origins.length === 1
     && !browserTask.explicitPage ? prepareLibrarySeatQuery(command) : undefined
   if (librarySeats?.reply) return finishLocal(librarySeats.reply, true)
@@ -187,7 +192,7 @@ export async function runAgent(input: RunAgentInput) {
   const taskPlanRequired = !followedQuery && Boolean(actionIntent.requiresTaskPlan)
   const modelToolDefinitions = (taskPlanRequired
     ? toolDefinitions.filter((tool) => tool.name === 'task.create') : toolDefinitions).filter(tool => (!input.operation || operationAllows(input.operation.scope, tool)) && (!experience || operationAllows(experience.scope, tool)) && !browserBlock(tool.name) && !browserPurposeBlock(input.message, {id:'definition',name:tool.name,arguments:{}}, browserTask))
-  let directAction = folderStart?.nextCall ?? browserFlow?.initialCall ?? publicSite?.initialCall ?? librarySeats?.call ?? browserCheck ?? (followedQuery ? {id:`browser-direct-${crypto.randomUUID()}`,name:'browser.followed_live',arguments:{}} : liveRoomFlow?.initialCall ?? actionIntent.directCall)
+  let directAction = folderStart?.nextCall ?? creatorCall ?? browserFlow?.initialCall ?? publicSite?.initialCall ?? librarySeats?.call ?? browserCheck ?? (followedQuery ? {id:`browser-direct-${crypto.randomUUID()}`,name:'browser.followed_live',arguments:{}} : liveRoomFlow?.initialCall ?? actionIntent.directCall)
   let actionRetryUsed = false
   let malformedToolRetryUsed = false
   let verificationRetry=false
@@ -350,6 +355,15 @@ export async function runAgent(input: RunAgentInput) {
       continue
     }
     browserReads.accept(call, result)
+    if (call === creatorCall && browserTask?.creator) return finishLocal(creatorActivityReply(result, browserTask.creator, showSources), true)
+    if (call.name === 'browser.extract' && result.success) {
+      const evidence = result.data as { excerpts: string[]; truncated: boolean }
+      if (!evidence?.excerpts?.length) return finishLocal('当前页的可见内容里暂未找到对应字样。', true)
+      execution.transition('verifying')
+      execution.transition('verified')
+      const snippets = evidence.excerpts.map(value => `> ${escapePageText(value)}`).join('\n\n')
+      return finishLocal(`当前页核对到以下内容。\n\n${snippets}${evidence.truncated ? '\n\n页面较长，以上是当前可见节选。' : ''}`, true)
+    }
     reply.accept({ call, result, definition: tool?.definition })
     if (librarySeats?.call === call) return finishLocal(librarySeats.summarize(result), true)
     if (siteBlock) return finishLocal(siteBlock, true)
